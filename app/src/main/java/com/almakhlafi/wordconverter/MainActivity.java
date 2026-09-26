@@ -31,6 +31,7 @@ public class MainActivity extends AppCompatActivity {
     static final int PICK=100, CREATE=200, CAMERA=300, TREE=400;
     LinearLayout list, root;
     TextView status;
+    MaterialCardView selectedCard;
     LinearProgressIndicator progress;
     ArrayList<Uri> selected=new ArrayList<>();
     File pendingOutput;
@@ -63,98 +64,80 @@ public class MainActivity extends AppCompatActivity {
 
         ScrollView scroll=new ScrollView(this);
         scroll.setFillViewport(true);
+        scroll.setVerticalScrollBarEnabled(false);
+
         LinearLayout page=new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        page.setPadding(12,8,12,18);
+        page.setPadding(14,10,14,16);
         page.setBackgroundColor(Color.rgb(247,252,249));
 
-        // ===== Hero header =====
+        // ===== Compact header: title only, no crowding =====
         MaterialCardView hero=card();
         hero.setCardBackgroundColor(Color.rgb(7,126,82));
         hero.setStrokeWidth(0);
-        LinearLayout heroBox=new LinearLayout(this);
-        heroBox.setOrientation(LinearLayout.HORIZONTAL);
-        heroBox.setGravity(Gravity.CENTER_VERTICAL);
-        heroBox.setPadding(14,12,14,12);
-
-        LinearLayout brand=new LinearLayout(this);
-        brand.setOrientation(LinearLayout.VERTICAL);
-        brand.setGravity(Gravity.CENTER_VERTICAL|Gravity.RIGHT);
+        LinearLayout h=new LinearLayout(this);
+        h.setOrientation(LinearLayout.HORIZONTAL);
+        h.setGravity(Gravity.CENTER_VERTICAL);
+        h.setPadding(12,8,12,8);
 
         TextView title=new TextView(this);
         title.setText("W-المخلافي");
         title.setTextColor(Color.WHITE);
-        title.setTextSize(31);
+        title.setTextSize(29);
         title.setTypeface(null,Typeface.BOLD);
-        title.setGravity(Gravity.RIGHT);
-
-        TextView sub=new TextView(this);
-        sub.setText("تحويل الملفات والمستندات إلى وورد");
-        sub.setTextColor(Color.WHITE);
-        sub.setTextSize(13);
-        sub.setTypeface(null,Typeface.BOLD);
-        sub.setGravity(Gravity.RIGHT);
-        brand.addView(title);
-        brand.addView(sub);
+        title.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+        h.addView(title,new LinearLayout.LayoutParams(0,64,1));
 
         TextView logo=new TextView(this);
-        logo.setText("W↗");
-        logo.setTextColor(Color.rgb(7,126,82));
-        logo.setTextSize(34);
+        logo.setText("W");
+        logo.setTextColor(greenDark());
+        logo.setTextSize(30);
         logo.setTypeface(null,Typeface.BOLD);
         logo.setGravity(Gravity.CENTER);
-        logo.setBackground(gradient(Color.WHITE,Color.rgb(225,255,243),24));
-        logo.setPadding(8,4,8,4);
+        logo.setBackground(gradient(Color.WHITE,Color.rgb(225,255,243),20));
+        h.addView(logo,new LinearLayout.LayoutParams(62,62));
 
-        heroBox.addView(brand,new LinearLayout.LayoutParams(0,90,1));
-        LinearLayout.LayoutParams lpLogo=new LinearLayout.LayoutParams(82,82);
-        lpLogo.setMargins(10,0,0,0);
-        heroBox.addView(logo,lpLogo);
+        MaterialButton headerSettings=smallHeaderButton("⚙");
+        headerSettings.setOnClickListener(v->settingsDialog());
+        h.addView(headerSettings,new LinearLayout.LayoutParams(54,58));
 
-        TextView dhikrTop=new TextView(this);
-        dhikrTop.setText("صلِّ على محمد\\nصلى الله عليه وسلم\\nوعلى آله الطيبين الطاهرين");
-        dhikrTop.setTextColor(Color.WHITE);
-        dhikrTop.setTextSize(14);
-        dhikrTop.setTypeface(null,Typeface.BOLD);
-        dhikrTop.setGravity(Gravity.CENTER);
-        dhikrTop.setPadding(12,6,12,6);
-        dhikrTop.setBackground(gradient(Color.rgb(10,103,69),Color.rgb(14,139,91),28));
-        heroBox.addView(dhikrTop,new LinearLayout.LayoutParams(175,86));
+        hero.addView(h);
+        page.addView(hero,new LinearLayout.LayoutParams(-1,82));
 
-        hero.addView(heroBox);
-        page.addView(hero,new LinearLayout.LayoutParams(-1,118));
+        // ===== Dhikr =====
+        MaterialCardView dhikr=card();
+        dhikr.setCardBackgroundColor(Color.rgb(226,248,239));
+        dhikr.setStrokeColor(Color.rgb(190,225,211));
+        dhikr.setStrokeWidth(1);
+        TextView d=new TextView(this);
+        d.setText("صلِّ على محمد صلى الله عليه وسلم\\nوعلى آله الطيبين الطاهرين");
+        d.setTextColor(greenDark());
+        d.setTextSize(16);
+        d.setTypeface(null,Typeface.BOLD);
+        d.setGravity(Gravity.CENTER);
+        d.setPadding(10,5,10,5);
+        dhikr.addView(d);
+        page.addView(dhikr,new LinearLayout.LayoutParams(-1,72));
 
-        // ===== Large action cards =====
+        // ===== Main actions =====
         LinearLayout actions=new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setGravity(Gravity.CENTER);
-        actions.setPadding(0,10,0,7);
+        actions.setPadding(0,7,0,5);
 
         MaterialCardView cameraCard=featureCard("📷","المسح الضوئي\\nبالكاميرا","التقاط صورة وتحويلها إلى وورد");
         cameraCard.setOnClickListener(v->camera());
         MaterialCardView importCard=featureCard("📂","استيراد الملفات","من الجهاز أو الذاكرة الخارجية");
         importCard.setOnClickListener(v->pick());
-        actions.addView(cameraCard,new LinearLayout.LayoutParams(0,126,1));
-        actions.addView(importCard,new LinearLayout.LayoutParams(0,126,1));
+        actions.addView(cameraCard,new LinearLayout.LayoutParams(0,112,1));
+        actions.addView(importCard,new LinearLayout.LayoutParams(0,112,1));
         page.addView(actions);
 
-        // ===== Dropdown buttons =====
-        LinearLayout menuButtons=new LinearLayout(this);
-        menuButtons.setOrientation(LinearLayout.HORIZONTAL);
-        menuButtons.setPadding(0,3,0,3);
+        // ===== Conversion menu: commands hidden until pressed =====
+        MaterialButton convert=greenOutlineButton("⇄   تحويلات   ﹀");
+        page.addView(convert,new LinearLayout.LayoutParams(-1,56));
 
-        MaterialButton more=greenOutlineButton("•••    المزيد    ﹀");
-        MaterialButton convert=greenOutlineButton("⇄    تحويلات    ﹀");
-        menuButtons.addView(more,new LinearLayout.LayoutParams(0,62,1));
-        menuButtons.addView(convert,new LinearLayout.LayoutParams(0,62,1));
-        page.addView(menuButtons);
-
-        // Panels are visible by default to match the supplied reference image.
-        LinearLayout panelRow=new LinearLayout(this);
-        panelRow.setOrientation(LinearLayout.HORIZONTAL);
-        panelRow.setGravity(Gravity.TOP);
-
-        LinearLayout convertPanel=referencePanel();
+        final LinearLayout convertPanel=referencePanel();
+        convertPanel.setVisibility(View.GONE);
         addReferenceItem(convertPanel,"📄","PDF إلى Word",v->pickPdf());
         addReferenceItem(convertPanel,"🖨","PDF ممسوح → OCR → Word",v->pickPdf());
         addReferenceItem(convertPanel,"🖼","الصور إلى Word",v->pickImages());
@@ -162,91 +145,69 @@ public class MainActivity extends AppCompatActivity {
         addReferenceItem(convertPanel,"W","Word إلى Word",v->pick());
         addReferenceItem(convertPanel,"P","PowerPoint إلى Word",v->pick());
         addReferenceItem(convertPanel,"📚","تحويل مجموعة ملفات دفعة واحدة",v->pick());
+        page.addView(convertPanel);
 
-        LinearLayout morePanel=referencePanel();
-        addReferenceItem(morePanel,"▥","المكتبة",v->showLibrary());
-        addReferenceItem(morePanel,"▱","مكان الحفظ",v->chooseSaveFolder());
-        addReferenceItem(morePanel,"⚙","الإعدادات",v->settingsDialog());
-        addReferenceItem(morePanel,"▣","مسح الذاكرة المؤقتة",v->clearCache());
-        addReferenceItem(morePanel,"ⓘ","معلومات التطبيق",v->infoDialog());
-
-        panelRow.addView(morePanel,new LinearLayout.LayoutParams(0,-2,1));
-        panelRow.addView(convertPanel,new LinearLayout.LayoutParams(0,-2,1));
-        page.addView(panelRow);
-
-        more.setOnClickListener(v->{
-            boolean show=morePanel.getVisibility()!=View.VISIBLE;
-            morePanel.setVisibility(show?View.VISIBLE:View.GONE);
-            if(show)convertPanel.setVisibility(View.GONE);
-        });
         convert.setOnClickListener(v->{
-            boolean show=convertPanel.getVisibility()!=View.VISIBLE;
-            convertPanel.setVisibility(show?View.VISIBLE:View.GONE);
-            if(show)morePanel.setVisibility(View.GONE);
+            convertPanel.setVisibility(convertPanel.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE);
         });
 
         // ===== Quick tools =====
-        TextView quickTitle=sectionHeader("⚡  أدوات سريعة");
-        page.addView(quickTitle,new LinearLayout.LayoutParams(-1,48));
-
+        page.addView(sectionHeader("⚡  أدوات سريعة"),new LinearLayout.LayoutParams(-1,46));
         LinearLayout quick=new LinearLayout(this);
         quick.setOrientation(LinearLayout.HORIZONTAL);
-        quick.setGravity(Gravity.CENTER);
-        addQuick(quick,"📷","المسح الضوئي\\nبالكاميرا","",v->camera());
+        addQuick(quick,"📷","المسح الضوئي","بالكاميرا",v->camera());
         addQuick(quick,"📄","PDF إلى Word","سريع ودقيق",v->pickPdf());
         addQuick(quick,"🖼","صور إلى Word","بجودة عالية",v->pickImages());
-        addQuick(quick,"📚","تحويل ملفات متعددة","دفعة واحدة",v->pick());
-        page.addView(quick);
+        addQuick(quick,"📚","ملفات متعددة","دفعة واحدة",v->pick());
+        page.addView(quick,new LinearLayout.LayoutParams(-1,104));
 
         // ===== Recent files =====
-        LinearLayout recentHead=new LinearLayout(this);
-        recentHead.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout rh=new LinearLayout(this);
+        rh.setGravity(Gravity.CENTER_VERTICAL);
         TextView recent=sectionHeader("◷  الملفات الحديثة");
         TextView all=new TextView(this);
         all.setText("عرض الكل");
-        all.setTextSize(14);
+        all.setTextSize(13);
         all.setTextColor(Color.DKGRAY);
         all.setGravity(Gravity.CENTER);
-        all.setPadding(18,8,18,8);
-        all.setBackground(gradient(Color.WHITE,Color.rgb(238,248,243),24));
-        recentHead.addView(recent,new LinearLayout.LayoutParams(0,52,1));
-        recentHead.addView(all,new LinearLayout.LayoutParams(105,45));
-        page.addView(recentHead);
+        all.setBackground(gradient(Color.WHITE,Color.rgb(238,248,243),22));
+        rh.addView(recent,new LinearLayout.LayoutParams(0,46,1));
+        rh.addView(all,new LinearLayout.LayoutParams(92,40));
+        page.addView(rh);
 
         LinearLayout recentCards=new LinearLayout(this);
         recentCards.setOrientation(LinearLayout.HORIZONTAL);
-        recentCards.setGravity(Gravity.CENTER);
         addRecentPlaceholder(recentCards,"مستند 1");
         addRecentPlaceholder(recentCards,"صورة 2");
         addRecentPlaceholder(recentCards,"PDF ملف");
         addRecentPlaceholder(recentCards,"مستند 4");
-        page.addView(recentCards,new LinearLayout.LayoutParams(-1,145));
+        page.addView(recentCards,new LinearLayout.LayoutParams(-1,116));
 
-        // ===== Selected files / conversion status =====
-        MaterialCardView filesCard=card();
-        filesCard.setStrokeColor(Color.rgb(50,180,130));
-        filesCard.setStrokeWidth(1);
+        // ===== Selected files: hidden until user selects files =====
+        selectedCard=card();
+        selectedCard.setStrokeColor(Color.rgb(50,180,130));
+        selectedCard.setStrokeWidth(1);
         LinearLayout filesBox=new LinearLayout(this);
         filesBox.setOrientation(LinearLayout.VERTICAL);
-        TextView fh=sectionHeader("📂  الملفات المحددة");
-        filesBox.addView(fh);
-        ScrollView fileScroll=new ScrollView(this);
+        filesBox.addView(sectionHeader("📂  الملفات المحددة"));
         list=new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
+        ScrollView fileScroll=new ScrollView(this);
         fileScroll.addView(list);
-        filesBox.addView(fileScroll,new LinearLayout.LayoutParams(-1,110));
-        filesCard.addView(filesBox);
-        page.addView(filesCard);
+        filesBox.addView(fileScroll,new LinearLayout.LayoutParams(-1,100));
+        selectedCard.addView(filesBox);
+        selectedCard.setVisibility(View.GONE);
+        page.addView(selectedCard,new LinearLayout.LayoutParams(-1,122));
 
         status=new TextView(this);
-        status.setText("جاهز — اختر المسح الضوئي أو استيراد الملفات.");
+        status.setText("جاهز");
         status.setTextColor(greenDark());
-        status.setTextSize(15);
+        status.setTextSize(14);
         status.setTypeface(null,Typeface.BOLD);
         status.setGravity(Gravity.CENTER);
-        status.setPadding(8,8,8,8);
-        status.setBackground(gradient(Color.rgb(231,249,241),Color.WHITE,18));
-        page.addView(status,new LinearLayout.LayoutParams(-1,52));
+        status.setBackground(gradient(Color.rgb(231,249,241),Color.WHITE,16));
+        status.setVisibility(View.GONE);
+        page.addView(status,new LinearLayout.LayoutParams(-1,46));
 
         progress=new LinearProgressIndicator(this);
         progress.setMax(100);
@@ -255,23 +216,54 @@ public class MainActivity extends AppCompatActivity {
 
         MaterialButton start=greenMainButton("▶   بدء التحويل");
         start.setOnClickListener(v->createOutput());
-        page.addView(start,new LinearLayout.LayoutParams(-1,58));
+        page.addView(start,new LinearLayout.LayoutParams(-1,54));
 
         scroll.addView(page,new ScrollView.LayoutParams(-1,-2));
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
 
-        // ===== Bottom navigation matching the reference =====
+        // ===== Footer navigation: secondary menus live here =====
         LinearLayout nav=new LinearLayout(this);
         nav.setOrientation(LinearLayout.HORIZONTAL);
         nav.setGravity(Gravity.CENTER);
+        nav.setPadding(4,3,4,3);
         nav.setBackgroundColor(Color.WHITE);
-        addNav(nav,"⋯","المزيد",v->more.performClick());
+
+        addNav(nav,"⋯","المزيد",v->showMorePopup(v));
         addNav(nav,"⚙","الإعدادات",v->settingsDialog());
-        addNav(nav,"◷","السجل",v->toast("سيتم عرض سجل التحويلات هنا."));
+        addNav(nav,"◷","السجل",v->toast("سجل التحويلات"));
         addNav(nav,"□","المكتبة",v->showLibrary());
         addNav(nav,"⌂","الرئيسية",v->scroll.smoothScrollTo(0,0));
-        root.addView(nav,new LinearLayout.LayoutParams(-1,78));
+        root.addView(nav,new LinearLayout.LayoutParams(-1,72));
+
         return root;
+    }
+
+    MaterialButton smallHeaderButton(String s){
+        MaterialButton b=new MaterialButton(this);
+        b.setText(s);
+        b.setTextSize(19);
+        b.setAllCaps(false);
+        b.setTextColor(Color.WHITE);
+        b.setGravity(Gravity.CENTER);
+        b.setCornerRadius(18);
+        b.setBackgroundColor(Color.TRANSPARENT);
+        b.setInsetTop(0);b.setInsetBottom(0);
+        return b;
+    }
+
+    void showMorePopup(View anchor){
+        PopupMenu p=new PopupMenu(this,anchor);
+        p.getMenu().add("📁 مكان الحفظ");
+        p.getMenu().add("🧹 مسح الذاكرة المؤقتة");
+        p.getMenu().add("ℹ معلومات التطبيق");
+        p.setOnMenuItemClickListener(i->{
+            String s=i.getTitle().toString();
+            if(s.contains("مكان الحفظ"))chooseSaveFolder();
+            else if(s.contains("مسح"))clearCache();
+            else infoDialog();
+            return true;
+        });
+        p.show();
     }
 
     MaterialCardView featureCard(String icon,String title,String sub){
@@ -465,7 +457,7 @@ public class MainActivity extends AppCompatActivity {
         else if(d.getData()!=null)add(d.getData());
     }
 
-    void add(Uri u){if(selected.contains(u))return;selected.add(u);TextView t=new TextView(this);t.setText("• "+name(u));t.setTextSize(15);t.setTextColor(text());t.setGravity(Gravity.RIGHT);t.setPadding(8,11,8,11);list.addView(t);}
+    void add(Uri u){if(selected.contains(u))return;selected.add(u);if(selectedCard!=null)selectedCard.setVisibility(View.VISIBLE);if(status!=null)status.setVisibility(View.VISIBLE);TextView t=new TextView(this);t.setText("• "+name(u));t.setTextSize(15);t.setTextColor(text());t.setGravity(Gravity.RIGHT);t.setPadding(8,11,8,11);list.addView(t);}
     String name(Uri u){try{Cursor c=getContentResolver().query(u,new String[]{OpenableColumns.DISPLAY_NAME},null,null,null);if(c!=null){try{if(c.moveToFirst())return c.getString(0);}finally{c.close();}}}catch(Exception ignored){}return u.toString();}
 
     void createOutput(){
