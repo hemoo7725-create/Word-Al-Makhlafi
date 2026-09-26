@@ -232,7 +232,7 @@ public class MainActivity extends AppCompatActivity {
 
     String normalizeText(String x){
         if(x==null)return "";
-        String s=x.replace('أ','ا').replace('إ','ا').replace('آ','ا').replace('ٱ','ا').replace('ـ','');
+        String s=x.replace('أ','ا').replace('إ','ا').replace('آ','ا').replace('ٱ','ا').replace("ـ","");
         s=s.replaceAll("[ \\t]+"," ").replaceAll(" *\\n *","\\n");
         s=s.replaceAll(" +([،؛:؟,.!])","$1");
         return s.trim();
