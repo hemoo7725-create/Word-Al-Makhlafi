@@ -78,8 +78,9 @@ public class MainActivity extends AppCompatActivity {
 
         LinearLayout bar=new LinearLayout(this); bar.setGravity(Gravity.RIGHT);
         MaterialButton add=new MaterialButton(this); add.setText("➕ إضافة ملفات");
+        MaterialButton library=new MaterialButton(this); library.setText("📚 الحافظة");
         MaterialButton clear=new MaterialButton(this); clear.setText("مسح");
-        bar.addView(clear); bar.addView(add); root.addView(bar);
+        bar.addView(clear); bar.addView(library); bar.addView(add); root.addView(bar);
 
         MaterialCardView conversionCard=card();
         LinearLayout actions=new LinearLayout(this); actions.setOrientation(LinearLayout.VERTICAL); actions.setPadding(12,10,12,10);
