@@ -379,6 +379,34 @@ public class MainActivity extends AppCompatActivity {
     MaterialButton bigGreenButton(String s){return greenMainButton(s);}
     MaterialButton menuButton(String s){return greenOutlineButton(s);}
 
+    MaterialCardView card(){
+        MaterialCardView c=new MaterialCardView(this);
+        c.setRadius(18);
+        c.setCardElevation(2);
+        c.setUseCompatPadding(true);
+        c.setContentPadding(0,0,0,0);
+        return c;
+    }
+
+    android.graphics.drawable.GradientDrawable gradient(int top,int bottom,int radius){
+        android.graphics.drawable.GradientDrawable g=new android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+            new int[]{top,bottom});
+        g.setCornerRadius(radius);
+        return g;
+    }
+
+    TextView sectionTitle(String s){
+        TextView t=new TextView(this);
+        t.setText(s);
+        t.setTextSize(21);
+        t.setTypeface(null,Typeface.BOLD);
+        t.setTextColor(greenDark());
+        t.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+        t.setPadding(6,4,6,4);
+        return t;
+    }
+
     void conversionMenu(View anchor){
         PopupMenu p=new PopupMenu(this,anchor);
         p.getMenu().add("PDF إلى Word — كل الصفحات");
