@@ -56,58 +56,252 @@ public class MainActivity extends AppCompatActivity {
     int greenLight(){return Color.rgb(66,190,146);}
 
     View ui(){
-        root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setPadding(14,14,14,10); root.setBackgroundColor(bg());
+        root=new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(10,10,10,8);
+        root.setGravity(Gravity.FILL_HORIZONTAL);
+        root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        root.setBackgroundColor(Color.rgb(244,250,247));
 
-        LinearLayout header=new LinearLayout(this); header.setOrientation(LinearLayout.HORIZONTAL); header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setBackground(gradient(greenDark(),green(),30)); header.setPadding(18,10,12,10);
-        LinearLayout titleBox=new LinearLayout(this); titleBox.setOrientation(LinearLayout.VERTICAL); titleBox.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title=new TextView(this); title.setText("W-المخلافي"); title.setTextSize(27); title.setTypeface(null,1); title.setTextColor(Color.WHITE); title.setGravity(Gravity.RIGHT);
-        TextView subTitle=new TextView(this); subTitle.setText("تحويل المستندات إلى Word قابل للتحرير"); subTitle.setTextSize(13); subTitle.setTextColor(Color.WHITE); subTitle.setGravity(Gravity.RIGHT);
-        titleBox.addView(title); titleBox.addView(subTitle);
-        header.addView(titleBox,new LinearLayout.LayoutParams(0,82,1));
-        MaterialButton settings=new MaterialButton(this); settings.setText("⚙"); settings.setTextSize(22); settings.setTextColor(Color.WHITE); settings.setBackgroundColor(Color.TRANSPARENT);
-        settings.setOnClickListener(v->settingsDialog()); header.addView(settings,new LinearLayout.LayoutParams(64,64));
-        root.addView(header);
+        // ===== Header: green branded banner =====
+        LinearLayout header=new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(14,10,14,10);
+        header.setBackground(gradient(Color.rgb(8,112,78),Color.rgb(24,154,112),28));
 
-        MaterialCardView dhikr=card(); dhikr.setCardBackgroundColor(Color.rgb(230,249,241));
-        TextView d=new TextView(this); d.setText("ﷺ  صلِّ على محمد صلى الله عليه وسلم وعلى آله الطيبين الطاهرين  ﷺ"); d.setTextSize(17); d.setTypeface(null,1); d.setTextColor(greenDark()); d.setGravity(Gravity.CENTER); d.setPadding(12,15,12,15);
-        dhikr.addView(d); root.addView(dhikr);
+        LinearLayout brand=new LinearLayout(this);
+        brand.setOrientation(LinearLayout.HORIZONTAL);
+        brand.setGravity(Gravity.CENTER_VERTICAL);
 
-        LinearLayout primary=new LinearLayout(this); primary.setOrientation(LinearLayout.HORIZONTAL); primary.setGravity(Gravity.CENTER); primary.setPadding(0,8,0,8);
-        MaterialButton camera=bigGreenButton("📷  المسح الضوئي"); camera.setOnClickListener(v->camera());
-        MaterialButton importBtn=bigGreenButton("📂  استيراد الملفات"); importBtn.setOnClickListener(v->pick());
-        primary.addView(camera,new LinearLayout.LayoutParams(0,64,1)); primary.addView(importBtn,new LinearLayout.LayoutParams(0,64,1));
+        TextView logo=new TextView(this);
+        logo.setText("W");
+        logo.setTextColor(Color.WHITE);
+        logo.setTextSize(28);
+        logo.setTypeface(null,1);
+        logo.setGravity(Gravity.CENTER);
+        logo.setBackground(gradient(Color.WHITE,Color.rgb(230,255,245),20));
+        logo.setPadding(8,2,8,2);
+        brand.addView(logo,new LinearLayout.LayoutParams(58,58));
+
+        LinearLayout brandText=new LinearLayout(this);
+        brandText.setOrientation(LinearLayout.VERTICAL);
+        brandText.setGravity(Gravity.CENTER_VERTICAL|Gravity.RIGHT);
+        TextView title=new TextView(this);
+        title.setText("W-المخلافي");
+        title.setTextSize(29);
+        title.setTypeface(null,1);
+        title.setTextColor(Color.WHITE);
+        title.setGravity(Gravity.RIGHT);
+        TextView subTitle=new TextView(this);
+        subTitle.setText("تحويل الملفات والمستندات إلى وورد");
+        subTitle.setTextSize(12);
+        subTitle.setTextColor(Color.WHITE);
+        subTitle.setGravity(Gravity.RIGHT);
+        brandText.addView(title);
+        brandText.addView(subTitle);
+        brand.addView(brandText,new LinearLayout.LayoutParams(0,72,1));
+        header.addView(brand,new LinearLayout.LayoutParams(0,86,1));
+
+        MaterialButton settings=new MaterialButton(this);
+        settings.setText("⚙");
+        settings.setTextSize(21);
+        settings.setAllCaps(false);
+        settings.setTextColor(Color.WHITE);
+        settings.setBackgroundColor(Color.TRANSPARENT);
+        settings.setOnClickListener(v->settingsDialog());
+        header.addView(settings,new LinearLayout.LayoutParams(52,58));
+        root.addView(header,new LinearLayout.LayoutParams(-1,96));
+
+        // ===== Dhikr plaque =====
+        MaterialCardView dhikr=card();
+        dhikr.setCardBackgroundColor(Color.rgb(226,248,239));
+        dhikr.setStrokeColor(Color.rgb(184,220,207));
+        dhikr.setStrokeWidth(1);
+        TextView d=new TextView(this);
+        d.setText("ﷺ  صلِّ على محمد صلى الله عليه وسلم وعلى آله الطيبين الطاهرين  ﷺ");
+        d.setTextSize(17);
+        d.setTypeface(null,1);
+        d.setTextColor(greenDark());
+        d.setGravity(Gravity.CENTER);
+        d.setPadding(12,10,12,10);
+        dhikr.addView(d);
+        root.addView(dhikr,new LinearLayout.LayoutParams(-1,82));
+
+        // ===== Main action cards =====
+        LinearLayout primary=new LinearLayout(this);
+        primary.setOrientation(LinearLayout.HORIZONTAL);
+        primary.setGravity(Gravity.CENTER);
+        primary.setPadding(0,7,0,7);
+
+        MaterialButton importBtn=actionButton("📂  استيراد الملفات\\nمن الجهاز أو الذاكرة الخارجية",false);
+        importBtn.setOnClickListener(v->pick());
+        MaterialButton camera=actionButton("📷  المسح الضوئي\\nبالكاميرا",false);
+        camera.setOnClickListener(v->camera());
+        primary.addView(importBtn,new LinearLayout.LayoutParams(0,78,1));
+        primary.addView(camera,new LinearLayout.LayoutParams(0,78,1));
         root.addView(primary);
 
-        LinearLayout menuRow=new LinearLayout(this); menuRow.setGravity(Gravity.CENTER); menuRow.setPadding(0,2,0,6);
-        MaterialButton convert=menuButton("تحويلات ▾"); convert.setOnClickListener(v->conversionMenu(convert));
-        MaterialButton more=menuButton("المزيد ▾"); more.setOnClickListener(v->moreMenu(more));
-        menuRow.addView(convert,new LinearLayout.LayoutParams(0,58,1)); menuRow.addView(more,new LinearLayout.LayoutParams(0,58,1));
+        // ===== Named dropdown controls =====
+        LinearLayout menuRow=new LinearLayout(this);
+        menuRow.setOrientation(LinearLayout.HORIZONTAL);
+        menuRow.setGravity(Gravity.CENTER);
+        MaterialButton more=purpleMenuButton("•••   المزيد   ﹀");
+        MaterialButton convert=purpleMenuButton("⇄   تحويلات   ﹀");
+        menuRow.addView(more,new LinearLayout.LayoutParams(0,60,1));
+        menuRow.addView(convert,new LinearLayout.LayoutParams(0,60,1));
         root.addView(menuRow);
 
+        LinearLayout menus=new LinearLayout(this);
+        menus.setOrientation(LinearLayout.VERTICAL);
+        menus.setVisibility(View.GONE);
+        menus.setPadding(2,2,2,5);
+
+        LinearLayout convertPanel=dropdownPanel();
+        addMenuItem(convertPanel,"📄  PDF إلى Word — كل الصفحات",v->pickPdf());
+        addMenuItem(convertPanel,"🖨  PDF ممسوح ضوئيًا → OCR → Word",v->pickPdf());
+        addMenuItem(convertPanel,"🖼  الصور إلى Word",v->pickImages());
+        addMenuItem(convertPanel,"📊  Excel إلى Word",v->pick());
+        addMenuItem(convertPanel,"📝  Word إلى Word",v->pick());
+        addMenuItem(convertPanel,"📽  PowerPoint إلى Word",v->pick());
+        addMenuItem(convertPanel,"📚  تحويل مجموعة ملفات دفعة واحدة",v->pick());
+
+        LinearLayout morePanel=dropdownPanel();
+        addMenuItem(morePanel,"📚  المكتبة",v->showLibrary());
+        addMenuItem(morePanel,"📁  مكان الحفظ",v->chooseSaveFolder());
+        addMenuItem(morePanel,"⚙  الإعدادات",v->settingsDialog());
+        addMenuItem(morePanel,"🧹  مسح التخزين المؤقت",v->clearCache());
+        addMenuItem(morePanel,"ℹ  معلومات التطبيق",v->infoDialog());
+
+        LinearLayout panels=new LinearLayout(this);
+        panels.setOrientation(LinearLayout.HORIZONTAL);
+        panels.addView(morePanel,new LinearLayout.LayoutParams(0,-2,1));
+        panels.addView(convertPanel,new LinearLayout.LayoutParams(0,-2,1));
+        menus.addView(panels);
+        root.addView(menus);
+
+        more.setOnClickListener(v->{
+            if(menus.getVisibility()!=View.VISIBLE){menus.setVisibility(View.VISIBLE);convertPanel.setVisibility(View.GONE);morePanel.setVisibility(View.VISIBLE);}
+            else {menus.setVisibility(View.GONE);}
+        });
+        convert.setOnClickListener(v->{
+            if(menus.getVisibility()!=View.VISIBLE){menus.setVisibility(View.VISIBLE);morePanel.setVisibility(View.GONE);convertPanel.setVisibility(View.VISIBLE);}
+            else if(convertPanel.getVisibility()==View.VISIBLE){menus.setVisibility(View.GONE);}
+            else {morePanel.setVisibility(View.GONE);convertPanel.setVisibility(View.VISIBLE);}
+        });
+
+        // ===== Selected files =====
         MaterialCardView filesCard=card();
-        LinearLayout filesBox=new LinearLayout(this); filesBox.setOrientation(LinearLayout.VERTICAL); filesBox.setPadding(12,8,12,8);
+        filesCard.setStrokeColor(Color.rgb(38,166,120));
+        filesCard.setStrokeWidth(1);
+        LinearLayout filesBox=new LinearLayout(this);
+        filesBox.setOrientation(LinearLayout.VERTICAL);
+        filesBox.setPadding(12,8,12,8);
         TextView fh=sectionTitle("الملفات المحددة");
+        fh.setTextSize(22);
         filesBox.addView(fh);
-        ScrollView sv=new ScrollView(this); list=new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL); list.setPadding(4,4,4,4); sv.addView(list);
-        filesBox.addView(sv,new LinearLayout.LayoutParams(-1,0,1)); filesCard.addView(filesBox);
+        ScrollView sv=new ScrollView(this);
+        list=new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(5,5,5,5);
+        sv.addView(list);
+        filesBox.addView(sv,new LinearLayout.LayoutParams(-1,0,1));
+        filesCard.addView(filesBox);
         root.addView(filesCard,new LinearLayout.LayoutParams(-1,0,1));
 
-        progress=new LinearProgressIndicator(this); progress.setMax(100); progress.setVisibility(View.GONE); root.addView(progress);
-        status=new TextView(this); status.setText("جاهز — اختر المسح الضوئي أو استيراد الملفات."); status.setTextColor(text()); status.setGravity(Gravity.RIGHT); status.setPadding(6,8,6,6); root.addView(status);
+        // ===== Status =====
+        status=new TextView(this);
+        status.setText("جاهز — اختر المسح الضوئي أو استيراد الملفات.");
+        status.setTextColor(greenDark());
+        status.setTextSize(15);
+        status.setTypeface(null,1);
+        status.setGravity(Gravity.CENTER);
+        status.setPadding(8,6,8,6);
+        status.setBackground(gradient(Color.rgb(231,249,241),Color.WHITE,18));
+        root.addView(status,new LinearLayout.LayoutParams(-1,52));
 
-        LinearLayout bottom=new LinearLayout(this); bottom.setGravity(Gravity.CENTER);
-        MaterialButton start=bigGreenButton("▶  بدء التحويل"); start.setOnClickListener(v->createOutput());
-        MaterialButton clear=menuButton("مسح القائمة"); clear.setOnClickListener(v->{selected.clear();list.removeAllViews();status.setText("تم مسح القائمة.");});
-        bottom.addView(clear,new LinearLayout.LayoutParams(0,60,1)); bottom.addView(start,new LinearLayout.LayoutParams(0,60,1)); root.addView(bottom);
+        progress=new LinearProgressIndicator(this);
+        progress.setMax(100);
+        progress.setVisibility(View.GONE);
+        root.addView(progress,new LinearLayout.LayoutParams(-1,4));
+
+        // ===== Bottom commands =====
+        LinearLayout bottom=new LinearLayout(this);
+        bottom.setGravity(Gravity.CENTER);
+        MaterialButton start=purpleMenuButton("▶   بدء التحويل");
+        start.setTextColor(Color.WHITE);
+        start.setBackground(gradient(Color.rgb(96,69,166),Color.rgb(112,82,181),20));
+        start.setOnClickListener(v->createOutput());
+        MaterialButton clear=purpleMenuButton("مسح القائمة");
+        clear.setTextColor(Color.WHITE);
+        clear.setBackground(gradient(Color.rgb(96,69,166),Color.rgb(112,82,181),20));
+        clear.setOnClickListener(v->{selected.clear();list.removeAllViews();status.setText("تم مسح القائمة.");});
+        bottom.addView(clear,new LinearLayout.LayoutParams(0,56,1));
+        bottom.addView(start,new LinearLayout.LayoutParams(0,56,1));
+        root.addView(bottom);
         return root;
     }
 
-    MaterialButton bigGreenButton(String s){MaterialButton b=menuButton(s);b.setTextColor(Color.WHITE);b.setBackground(gradient(greenDark(),green(),22));b.setStrokeWidth(0);return b;}
-    MaterialButton menuButton(String s){MaterialButton b=new MaterialButton(this);b.setText(s);b.setTextSize(15);b.setAllCaps(false);b.setTextColor(text());b.setGravity(Gravity.CENTER);b.setCornerRadius(18);b.setStrokeWidth(1);b.setStrokeColor(android.content.res.ColorStateList.valueOf(green()));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-2,58);p.setMargins(5,4,5,4);b.setLayoutParams(p);return b;}
-    MaterialCardView card(){MaterialCardView c=new MaterialCardView(this);c.setRadius(24);c.setCardElevation(8);c.setUseCompatPadding(true);c.setCardBackgroundColor(isDark()?Color.rgb(30,45,38):Color.WHITE);return c;}
-    TextView sectionTitle(String s){TextView t=new TextView(this);t.setText(s);t.setTextSize(18);t.setTypeface(null,1);t.setTextColor(text());t.setGravity(Gravity.RIGHT);t.setPadding(6,4,6,8);return t;}
-    GradientDrawable gradient(int c1,int c2,int radius){GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{c1,c2});g.setCornerRadius(radius);return g;}
+    MaterialButton actionButton(String s,boolean unused){
+        MaterialButton b=new MaterialButton(this);
+        b.setText(s);
+        b.setTextSize(16);
+        b.setAllCaps(false);
+        b.setTextColor(Color.WHITE);
+        b.setGravity(Gravity.CENTER);
+        b.setCornerRadius(22);
+        b.setStrokeWidth(2);
+        b.setStrokeColor(android.content.res.ColorStateList.valueOf(Color.rgb(8,112,78)));
+        b.setBackground(gradient(Color.rgb(10,128,86),Color.rgb(26,165,113),22));
+        b.setInsetTop(0); b.setInsetBottom(0);
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-2,78);
+        p.setMargins(5,3,5,3);
+        b.setLayoutParams(p);
+        return b;
+    }
+
+    MaterialButton purpleMenuButton(String s){
+        MaterialButton b=new MaterialButton(this);
+        b.setText(s);
+        b.setTextSize(16);
+        b.setAllCaps(false);
+        b.setTextColor(Color.WHITE);
+        b.setGravity(Gravity.CENTER);
+        b.setCornerRadius(18);
+        b.setStrokeWidth(1);
+        b.setStrokeColor(android.content.res.ColorStateList.valueOf(Color.rgb(70,45,130)));
+        b.setBackground(gradient(Color.rgb(96,69,166),Color.rgb(112,82,181),20));
+        b.setInsetTop(0); b.setInsetBottom(0);
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-2,60);
+        p.setMargins(5,3,5,3);
+        b.setLayoutParams(p);
+        return b;
+    }
+
+    LinearLayout dropdownPanel(){
+        LinearLayout p=new LinearLayout(this);
+        p.setOrientation(LinearLayout.VERTICAL);
+        p.setPadding(6,4,6,4);
+        p.setBackground(gradient(Color.WHITE,Color.rgb(242,250,246),18));
+        return p;
+    }
+
+    void addMenuItem(LinearLayout panel,String label,View.OnClickListener click){
+        MaterialButton b=new MaterialButton(this);
+        b.setText(label+"    ›");
+        b.setTextSize(13);
+        b.setAllCaps(false);
+        b.setTextColor(Color.rgb(28,45,36));
+        b.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+        b.setCornerRadius(12);
+        b.setStrokeWidth(0);
+        b.setBackgroundColor(Color.TRANSPARENT);
+        b.setOnClickListener(v->{panel.setVisibility(View.GONE);click.onClick(v);});
+        panel.addView(b,new LinearLayout.LayoutParams(-1,44));
+    }
+
+    MaterialButton bigGreenButton(String s){return actionButton(s,false);}
+    MaterialButton menuButton(String s){return purpleMenuButton(s);}
 
     void conversionMenu(View anchor){
         PopupMenu p=new PopupMenu(this,anchor);
