@@ -560,11 +560,11 @@ public class MainActivity extends AppCompatActivity {
         StringBuilder s=new StringBuilder();
         for(int i=0;i<x.length();i++){
             char c=x.charAt(i);
-            boolean arabic=(c>='\\u0600'&&c<='\\u06FF')||(c>='\\u0750'&&c<='\\u077F')||(c>='\\u08A0'&&c<='\\u08FF');
-            boolean digit=(c>='0'&&c<='9')||(c>='\\u0660'&&c<='\\u0669')||(c>='\\u06F0'&&c<='\\u06F9');
+            boolean arabic=(c>='\u0600'&&c<='\u06FF')||(c>='\u0750'&&c<='\u077F')||(c>='\u08A0'&&c<='\u08FF');
+            boolean digit=(c>='0'&&c<='9')||(c>='\u0660'&&c<='\u0669')||(c>='\u06F0'&&c<='\u06F9');
             boolean punctuation=" ،؛:،.؟!?-_/()[]{}%+*=\\\"'".indexOf(c)>=0;
             if(Character.isWhitespace(c)||arabic||digit||punctuation) s.append(c);
-            else if(c=='\\u00ad'||c=='\\u200b'||c=='\\ufeff'||(c>='A'&&c<='Z')||(c>='a'&&c<='z')) s.append(' ');
+            else if(c=='\u00ad'||c=='\u200b'||c=='\ufeff'||(c>='A'&&c<='Z')||(c>='a'&&c<='z')) s.append(' ');
         }
         String q=s.toString().replaceAll("[ ]{2,}"," ");
         q=q.replaceAll("(?m)^[ ]+$","").replaceAll("(?m)^[^\\u0600-\\u06FF0-9٠-٩]+$","");
