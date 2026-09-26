@@ -495,18 +495,55 @@ public class MainActivity extends AppCompatActivity {
     }
 
     String cleanPages(ArrayList<String> pages){
-        ArrayList<String> cleaned=new ArrayList<>();for(String s:pages)cleaned.add(normalizeText(s));
-        if(!prefs.getBoolean("headerFooter",true))return joinPages(cleaned);
-        HashMap<String,Integer> first=new HashMap<>(),last=new HashMap<>();int n=cleaned.size();
-        for(String s:cleaned){String[] ls=s.split("\\R");if(ls.length>0){String a=key(ls[0]);if(!a.isEmpty())first.put(a,first.getOrDefault(a,0)+1);String z=key(ls[ls.length-1]);if(!z.isEmpty())last.put(z,last.getOrDefault(z,0)+1);}}
-        HashSet<String> fh=new HashSet<>(),ft=new HashSet<>();for(Map.Entry<String,Integer> e:first.entrySet())if(e.getValue()>=Math.max(2,(n+1)/2))fh.add(e.getKey());for(Map.Entry<String,Integer> e:last.entrySet())if(e.getValue()>=Math.max(2,(n+1)/2))ft.add(e.getKey());
-        for(String s:cleaned){String[] ls=s.split("\\R",-1);StringBuilder b=new StringBuilder();for(int i=0;i<ls.length;i++){String k=key(ls[i]);boolean skip=(i==0&&fh.contains(k))||(i==ls.length-1&&ft.contains(k))||(isPageNumber(ls[i])&&(i==0||i==ls.length-1));if(!skip)b.append(ls[i]).append("\n");}cleaned.add(0,"");break;}
-        // Rebuild without modifying while iterating.
-        ArrayList<String> out=new ArrayList<>();for(String s:cleaned){if(s.isEmpty()&&out.isEmpty())continue;out.add(s);}
+        ArrayList<String> cleaned=new ArrayList<>();
+        for(String s:pages) cleaned.add(normalizeText(cleanOcr(s==null?"":s)));
+        if(!prefs.getBoolean("headerFooter",true)) return joinPages(cleaned);
+
+        int n=cleaned.size();
+        HashMap<String,Integer> first=new HashMap<>(), second=new HashMap<>(), last=new HashMap<>(), beforeLast=new HashMap<>();
+        for(String s:cleaned){
+            String[] ls=s.split("\\R");
+            ArrayList<String> non=new ArrayList<>();
+            for(String line:ls) if(!line.trim().isEmpty()) non.add(line.trim());
+            if(non.size()>0) first.put(key(non.get(0)),first.getOrDefault(key(non.get(0)),0)+1);
+            if(non.size()>1) second.put(key(non.get(1)),second.getOrDefault(key(non.get(1)),0)+1);
+            if(non.size()>0){String q=key(non.get(non.size()-1));last.put(q,last.getOrDefault(q,0)+1);}
+            if(non.size()>1){String q=key(non.get(non.size()-2));beforeLast.put(q,beforeLast.getOrDefault(q,0)+1);}
+        }
+        int threshold=Math.max(2,(n+1)/2);
+        HashSet<String> repeatedTop=new HashSet<>(), repeatedBottom=new HashSet<>();
+        for(Map.Entry<String,Integer> e:first.entrySet()) if(e.getValue()>=threshold&&!e.getKey().isEmpty()) repeatedTop.add(e.getKey());
+        for(Map.Entry<String,Integer> e:second.entrySet()) if(e.getValue()>=threshold&&!e.getKey().isEmpty()) repeatedTop.add(e.getKey());
+        for(Map.Entry<String,Integer> e:last.entrySet()) if(e.getValue()>=threshold&&!e.getKey().isEmpty()) repeatedBottom.add(e.getKey());
+        for(Map.Entry<String,Integer> e:beforeLast.entrySet()) if(e.getValue()>=threshold&&!e.getKey().isEmpty()) repeatedBottom.add(e.getKey());
+
+        ArrayList<String> out=new ArrayList<>();
+        for(String s:cleaned){
+            String[] ls=s.split("\\R",-1);
+            StringBuilder bld=new StringBuilder();
+            for(int i=0;i<ls.length;i++){
+                String line=ls[i].trim();
+                if(line.isEmpty()) continue;
+                String k=key(line);
+                boolean edgeTop=i<=1, edgeBottom=i>=ls.length-2;
+                boolean skip=(edgeTop&&repeatedTop.contains(k))||(edgeBottom&&repeatedBottom.contains(k))||(isPageNumber(line)&&(edgeTop||edgeBottom));
+                if(!skip)bld.append(line).append("\\n");
+            }
+            out.add(bld.toString().trim());
+        }
         return joinPages(out);
     }
 
-    String joinPages(ArrayList<String> pages){StringBuilder b=new StringBuilder();for(String s:pages){if(b.length()>0)b.append("\n");b.append(s.trim());}return b.toString();}
+    String joinPages(ArrayList<String> pages){
+        StringBuilder b=new StringBuilder();
+        for(String s:pages){
+            String q=normalizeText(s);
+            if(q.isEmpty()) continue;
+            if(b.length()>0)b.append("\\n");
+            b.append(q);
+        }
+        return b.toString();
+    }
     String key(String s){return s.replaceAll("[\\s\\p{Punct}]+","").trim();}
     boolean isPageNumber(String s){return s.trim().matches("[0-9٠-٩]{1,5}");}
 
@@ -518,13 +555,32 @@ public class MainActivity extends AppCompatActivity {
         TessBaseAPI t=new TessBaseAPI();if(!t.init(getFilesDir().getAbsolutePath(),"ara+eng"))throw new Exception("فشل تشغيل OCR");t.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO);t.setImage(b);String x=t.getUTF8Text();t.recycle();return normalizeText(cleanOcr(x==null?"":x));
     }
 
-    String cleanOcr(String x){if(!prefs.getBoolean("clean",true))return x;StringBuilder s=new StringBuilder();for(int i=0;i<x.length();i++){char c=x.charAt(i);boolean ok=Character.isLetterOrDigit(c)||Character.isWhitespace(c)||" ،؛:,.!?؟-_/()[]{}%+*=\"'".indexOf(c)>=0;if(ok)s.append(c);else if(c=='\u00ad'||c=='\u200b'||c=='\ufeff'){}else s.append(' ');}return s.toString().replaceAll("[ ]{2,}"," ");}
+    String cleanOcr(String x){
+        if(x==null) return "";
+        StringBuilder s=new StringBuilder();
+        for(int i=0;i<x.length();i++){
+            char c=x.charAt(i);
+            boolean arabic=(c>='\\u0600'&&c<='\\u06FF')||(c>='\\u0750'&&c<='\\u077F')||(c>='\\u08A0'&&c<='\\u08FF');
+            boolean digit=(c>='0'&&c<='9')||(c>='\\u0660'&&c<='\\u0669')||(c>='\\u06F0'&&c<='\\u06F9');
+            boolean punctuation=" ،؛:،.؟!?-_/()[]{}%+*=\\\"'".indexOf(c)>=0;
+            if(Character.isWhitespace(c)||arabic||digit||punctuation) s.append(c);
+            else if(c=='\\u00ad'||c=='\\u200b'||c=='\\ufeff'||(c>='A'&&c<='Z')||(c>='a'&&c<='z')) s.append(' ');
+        }
+        String q=s.toString().replaceAll("[ ]{2,}"," ");
+        q=q.replaceAll("(?m)^[ ]+$","").replaceAll("(?m)^[^\\u0600-\\u06FF0-9٠-٩]+$","");
+        return q;
+    }
 
     String normalizeText(String x){
         if(x==null)return "";
-        String s=x.replace('أ','ا').replace('إ','ا').replace('آ','ا').replace('ٱ','ا').replace("ـ","");
+        String s=x.replace("ـ","");
+        // Conservative Arabic OCR/spelling cleanup: correct frequent OCR forms without rewriting the document.
+        String[] bad={"هاذا","هاذه","هاؤلاء","اللذي","اللذين","الذيي","التيي","لاكن","ولكنن","مسوول","مسئول","شيى","شئ","جزءا"};
+        String[] good={"هذا","هذه","هؤلاء","الذي","اللذين","الذي","التي","لكن","ولكن","مسؤول","مسؤول","شيء","شيء","جزءاً"};
+        for(int i=0;i<bad.length;i++) s=s.replaceAll("(?<![\\u0600-\\u06FF])"+bad[i]+"(?![\\u0600-\\u06FF])",good[i]);
         s=s.replaceAll("[ \\t]+"," ").replaceAll(" *\\n *","\\n");
         s=s.replaceAll(" +([،؛:؟,.!])","$1");
+        s=s.replaceAll("[ ]{2,}"," ");
         return s.trim();
     }
 
