@@ -547,7 +547,7 @@ public class MainActivity extends AppCompatActivity {
         String q=s.toString();
         // Remove Latin/English output and isolated OCR garbage completely.
         q=q.replaceAll("[A-Za-z]+"," ");
-        q=q.replaceAll("[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF0-9٠-٩ ،؛:،.؟!?()\[\]{}%+*=\\\"'/_-]"," ");
+        q=q.replaceAll("[^\\u0600-\\u06FF\\u0750-\\u077F\\u08A0-\\u08FF0-9٠-٩ ،؛:،.؟!?(){}%+*=\\\\\"'/_-]"," ");
         q=q.replaceAll("[ ]{2,}"," ");
         q=q.replaceAll("(?m)^[ ]+$","");
         q=q.replaceAll("(?m)^[^\u0600-\u06FF0-9٠-٩]+$","");
