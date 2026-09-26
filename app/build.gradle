@@ -1,0 +1,18 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.almakhlafi.wordconverter'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'com.almakhlafi.wordconverter'
+        minSdk 23
+        targetSdk 36
+        versionCode 1
+        versionName '1.0.0'
+    }
+    buildTypes { release { minifyEnabled false; shrinkResources false } }
+}
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'com.google.android.material:material:1.13.0'
+    implementation 'cz.adaptech.tesseract4android:tesseract4android:4.9.0'
+}
