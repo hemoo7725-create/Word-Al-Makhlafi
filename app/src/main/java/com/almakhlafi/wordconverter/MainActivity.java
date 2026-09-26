@@ -100,7 +100,7 @@ public class MainActivity extends AppCompatActivity {
 
         MaterialButton go=new MaterialButton(this); go.setText("🚀 بدء التحويل إلى Word"); go.setTextSize(16); go.setBackground(gradient(Color.rgb(25,91,145),Color.rgb(52,137,201),22));
         go.setTextColor(Color.WHITE); root.addView(go);
-        add.setOnClickListener(v->pick()); clear.setOnClickListener(v->{selected.clear();list.removeAllViews();status.setText("تم مسح القائمة.");});
+        add.setOnClickListener(v->pick()); library.setOnClickListener(v->showLibrary()); clear.setOnClickListener(v->{selected.clear();list.removeAllViews();status.setText("تم مسح القائمة.");});
         go.setOnClickListener(v->createOutput());
         return root;
     }
@@ -145,7 +145,7 @@ public class MainActivity extends AppCompatActivity {
     @Override protected void onActivityResult(int r,int c,Intent d){
         super.onActivityResult(r,c,d);
         if(r==CREATE){if(c==RESULT_OK&&d!=null&&d.getData()!=null)savePendingTo(d.getData());else status.setText("تم حفظ النسخة داخل مستندات التطبيق.");return;}
-        if(r==CAMERA){if(c==RESULT_OK){String p=getSharedPreferences("camera",0).getString("path",null);if(p!=null){Uri u=Uri.fromFile(new File(p));add(u);}}return;}
+        if(r==CAMERA){if(c==RESULT_OK){String p=getSharedPreferences("camera",0).getString("path",null);if(p!=null){File f=new File(p);if(f.exists()){Uri u=FileProvider.getUriForFile(this,getPackageName()+".fileprovider",f);add(u);}}}return;}
         if(c!=RESULT_OK||d==null||r!=PICK)return;
         if(d.getClipData()!=null){for(int i=0;i<d.getClipData().getItemCount();i++)add(d.getClipData().getItemAt(i).getUri());}
         else if(d.getData()!=null)add(d.getData());
