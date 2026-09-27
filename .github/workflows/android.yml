@@ -24,8 +24,8 @@ jobs:
       - name: Download OCR models
         run: |
           mkdir -p app/src/main/assets/tessdata
-          curl -L --fail -o app/src/main/assets/tessdata/ara.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/ara.traineddata
-          curl -L --fail -o app/src/main/assets/tessdata/eng.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata
+          curl -L --fail -o app/src/main/assets/tessdata/ara.traineddata https://github.com/tesseract-ocr/tessdata_best/raw/main/ara.traineddata
+          curl -L --fail -o app/src/main/assets/tessdata/eng.traineddata https://github.com/tesseract-ocr/tessdata_best/raw/main/eng.traineddata
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
