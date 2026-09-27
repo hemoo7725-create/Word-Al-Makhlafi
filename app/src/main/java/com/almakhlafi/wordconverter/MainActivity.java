@@ -805,7 +805,7 @@ public class MainActivity extends AppCompatActivity {
         StringBuilder out=new StringBuilder();
         for(LayoutLine l:lines){
             out.append("<<L ").append(l.x).append(" ").append(l.y).append(" ").append(l.w).append(" ").append(l.h).append(">>");
-            out.append(l.text.replace("\\n"," ").replace("\\r"," ")).append("\\n");
+            out.append(l.text.replace("\n"," ").replace("\r"," ")).append("\n");
         }
         return out.toString();
     }
