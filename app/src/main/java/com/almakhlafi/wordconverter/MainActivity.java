@@ -291,7 +291,7 @@ public class MainActivity extends AppCompatActivity {
     MaterialCardView dashboardCard(String icon,String title,String sub,int fill,int accent){
         MaterialCardView c=card();
         c.setCardBackgroundColor(fill);
-        c.setStrokeColor(Color.argb(45,accent));
+        c.setStrokeColor(Color.argb(45,Color.red(accent),Color.green(accent),Color.blue(accent)));
         c.setStrokeWidth(dp(1));
         c.setCardElevation(dp(2));
         LinearLayout b=new LinearLayout(this);
@@ -305,7 +305,7 @@ public class MainActivity extends AppCompatActivity {
         i.setTypeface(null,Typeface.BOLD);
         i.setTextColor(accent);
         i.setGravity(Gravity.CENTER);
-        i.setBackground(gradient(Color.WHITE,Color.argb(35,accent),dp(32)));
+        i.setBackground(gradient(Color.WHITE,Color.argb(35,Color.red(accent),Color.green(accent),Color.blue(accent)),dp(32)));
         b.addView(i,new LinearLayout.LayoutParams(dp(68),dp(68)));
 
         TextView t=new TextView(this);
