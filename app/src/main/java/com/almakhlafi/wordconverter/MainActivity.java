@@ -848,9 +848,6 @@ public class MainActivity extends AppCompatActivity {
         return joinPages(removeRepeatedHeadersFooters(p));
     }
 
-    String key(String s){return s.replaceAll("[\\s\\p{Punct}]+","").trim();}
-    boolean isPageNumber(String s){return s.trim().matches("[0-9٠-٩]{1,6}");}
-
     void writeDocxFromStream(File out,File source)throws Exception{
         ZipOutputStream z=new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(out)));
         put(z,"[Content_Types].xml","<?xml version='1.0'?><Types xmlns='http://schemas.openxmlformats.org/package/2006/content-types'><Default Extension='rels' ContentType='application/vnd.openxmlformats-package.relationships+xml'/><Default Extension='xml' ContentType='application/xml'/><Override PartName='/word/document.xml' ContentType='application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'/></Types>");
