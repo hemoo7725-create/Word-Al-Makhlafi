@@ -146,10 +146,12 @@ public class MainActivity extends AppCompatActivity {
         MaterialCardView cameraCard=actionCard("●","التقاط صورة");
         importCard.setOnClickListener(v->pick());
         cameraCard.setOnClickListener(v->camera());
-        LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(0,dp(154),1);
-        ap.setMargins(dp(6),dp(5),dp(6),dp(7));
-        row1.addView(importCard,ap);
-        row1.addView(cameraCard,ap);
+        LinearLayout.LayoutParams ap1=new LinearLayout.LayoutParams(0,dp(170),1);
+        ap1.setMargins(dp(7),dp(6),dp(7),dp(10));
+        LinearLayout.LayoutParams ap2=new LinearLayout.LayoutParams(0,dp(170),1);
+        ap2.setMargins(dp(7),dp(6),dp(7),dp(10));
+        row1.addView(importCard,ap1);
+        row1.addView(cameraCard,ap2);
         filesBox.addView(row1);
 
         LinearLayout row2=new LinearLayout(this);
@@ -159,8 +161,12 @@ public class MainActivity extends AppCompatActivity {
         MaterialCardView settingsCard=actionCard("⚙","الإعدادات");
         convertCard.setOnClickListener(v->createOutput());
         settingsCard.setOnClickListener(v->settingsDialog());
-        row2.addView(convertCard,ap);
-        row2.addView(settingsCard,ap);
+        LinearLayout.LayoutParams ap3=new LinearLayout.LayoutParams(0,dp(170),1);
+        ap3.setMargins(dp(7),dp(6),dp(7),dp(10));
+        LinearLayout.LayoutParams ap4=new LinearLayout.LayoutParams(0,dp(170),1);
+        ap4.setMargins(dp(7),dp(6),dp(7),dp(10));
+        row2.addView(convertCard,ap3);
+        row2.addView(settingsCard,ap4);
         filesBox.addView(row2);
 
         // قائمة الملفات لا تظهر إلا بعد الاستيراد، حتى تبقى الواجهة مطابقة للتصميم النظيف.
@@ -175,7 +181,7 @@ public class MainActivity extends AppCompatActivity {
         filesBox.addView(empty,new LinearLayout.LayoutParams(-1,dp(38)));
 
         selectedCard.addView(filesBox);
-        LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(-1,dp(570));
+        LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(-1,dp(600));
         page.addView(selectedCard,fp);
 
         status=new TextView(this);
@@ -200,33 +206,36 @@ public class MainActivity extends AppCompatActivity {
     }
 
     MaterialCardView actionCard(String icon,String label){
-        MaterialCardView c=card();
-        c.setCardBackgroundColor(Color.rgb(91,54,180));
-        c.setStrokeColor(Color.rgb(77,43,157));
-        c.setStrokeWidth(dp(1));
-        c.setCardElevation(dp(2));
+        MaterialCardView c=new MaterialCardView(this);
+        c.setRadius(dp(18));
+        c.setCardBackgroundColor(Color.rgb(92,50,180));
+        c.setStrokeWidth(0);
+        c.setCardElevation(dp(3));
+        c.setUseCompatPadding(false);
+
         LinearLayout box=new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setGravity(Gravity.CENTER);
-        box.setPadding(dp(6),dp(8),dp(6),dp(7));
+        box.setPadding(dp(6),dp(10),dp(6),dp(8));
 
         TextView ic=new TextView(this);
         ic.setText(icon);
         ic.setTextColor(Color.WHITE);
-        ic.setTextSize(42);
+        ic.setTextSize(44);
         ic.setTypeface(null,Typeface.BOLD);
         ic.setGravity(Gravity.CENTER);
-        box.addView(ic,new LinearLayout.LayoutParams(-1,dp(76)));
+        box.addView(ic,new LinearLayout.LayoutParams(-1,dp(82)));
 
         TextView t=new TextView(this);
         t.setText(label);
         t.setTextColor(Color.WHITE);
-        t.setTextSize(17);
+        t.setTextSize(19);
         t.setTypeface(null,Typeface.BOLD);
         t.setGravity(Gravity.CENTER);
-        t.setSingleLine(true);
-        box.addView(t,new LinearLayout.LayoutParams(-1,dp(44)));
-        c.addView(box);
+        t.setSingleLine(false);
+        box.addView(t,new LinearLayout.LayoutParams(-1,dp(54)));
+
+        c.addView(box,new MaterialCardView.LayoutParams(-1,-1));
         return c;
     }
 
