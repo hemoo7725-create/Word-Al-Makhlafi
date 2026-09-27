@@ -853,33 +853,34 @@ public class MainActivity extends AppCompatActivity {
 
     void writeDocxFromStream(File out,File source)throws Exception{
         ZipOutputStream z=new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(out)));
-        put(z,"[Content_Types].xml","<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>");
-        put(z,"_rels/.rels","<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>");
-        put(z,"word/_rels/document.xml.rels","<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>");
+        put(z,"[Content_Types].xml","<?xml version='1.0'?><Types xmlns='http://schemas.openxmlformats.org/package/2006/content-types'><Default Extension='rels' ContentType='application/vnd.openxmlformats-package.relationships+xml'/><Default Extension='xml' ContentType='application/xml'/><Override PartName='/word/document.xml' ContentType='application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'/></Types>");
+        put(z,"_rels/.rels","<?xml version='1.0'?><Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'><Relationship Id='rId1' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument' Target='word/document.xml'/></Relationships>");
+        put(z,"word/_rels/document.xml.rels","<?xml version='1.0'?><Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'/>");
         BufferedReader r=new BufferedReader(new InputStreamReader(new FileInputStream(source),"UTF-8"),65536);
-        StringBuilder body=new StringBuilder("<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>");
+        StringBuilder body=new StringBuilder("<w:document xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'><w:body>");
         String line; boolean table=false;
         while((line=r.readLine())!=null){
-            if(line.equals("<<TABLE>>")){table=true;body.append("<w:tbl><w:tblPr><w:tblBorders><w:top w:val="single"/><w:left w:val="single"/><w:bottom w:val="single"/><w:right w:val="single"/><w:insideH w:val="single"/><w:insideV w:val="single"/></w:tblBorders><w:tblW w:w="0" w:type="auto"/></w:tblPr>");continue;}
+            if(line.equals("<<TABLE>>")){
+                table=true;
+                body.append("<w:tbl><w:tblPr><w:tblBorders><w:top w:val='single'/><w:left w:val='single'/><w:bottom w:val='single'/><w:right w:val='single'/><w:insideH w:val='single'/><w:insideV w:val='single'/></w:tblBorders><w:tblW w:w='0' w:type='auto'/></w:tblPr>");
+                continue;
+            }
             if(line.equals("<</TABLE>>")){table=false;body.append("</w:tbl>");continue;}
             if(table){
                 body.append("<w:tr>");
                 String[] cells=line.split("\\t",-1);
                 for(String cell:cells){
-                    body.append("<w:tc><w:tcPr><w:tcBorders><w:top w:val="single"/><w:left w:val="single"/><w:bottom w:val="single"/><w:right w:val="single"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="right"/><w:bidi/></w:pPr><w:r><w:t xml:space="preserve">").append(xml(cell)).append("</w:t></w:r></w:p></w:tc>");
+                    body.append("<w:tc><w:tcPr><w:tcBorders><w:top w:val='single'/><w:left w:val='single'/><w:bottom w:val='single'/><w:right w:val='single'/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val='right'/><w:bidi/></w:pPr><w:r><w:t xml:space='preserve'>").append(xml(cell)).append("</w:t></w:r></w:p></w:tc>");
                 }
                 body.append("</w:tr>");
             }else if(!line.trim().isEmpty()){
-                body.append("<w:p><w:pPr><w:jc w:val="right"/>");
+                body.append("<w:p><w:pPr><w:jc w:val='right'/>");
                 if(prefs.getBoolean("rtl",true))body.append("<w:bidi/>");
-                body.append("<w:spacing w:after="100"/></w:pPr><w:r><w:t xml:space="preserve">").append(xml(line)).append("</w:t></w:r></w:p>");
-            }
-            if(body.length()>900000){ // keep one huge document manageable while still streaming the source
-                // StringBuilder is flushed conceptually by the JVM only; source itself remains streamed.
+                body.append("<w:spacing w:after='100'/></w:pPr><w:r><w:t xml:space='preserve'>").append(xml(line)).append("</w:t></w:r></w:p>");
             }
         }
         r.close();
-        body.append("<w:sectPr><w:pgMar w:top="720" w:right="900" w:bottom="720" w:left="900"/></w:sectPr></w:body></w:document>");
+        body.append("<w:sectPr><w:pgMar w:top='720' w:right='900' w:bottom='720' w:left='900'/></w:sectPr></w:body></w:document>");
         put(z,"word/document.xml",body.toString());
         z.close();
     }
