@@ -574,10 +574,8 @@ public class MainActivity extends AppCompatActivity {
             String pageText=ocrBitmapLayout(b);
             b.recycle();
             if(pageText!=null&&!pageText.trim().isEmpty()){
-                result.append("<<PDFPAGE ").append(pageW).append(" ").append(pageH).append(" ").append(w).append(" ").append(h).append(">>
-");
-                result.append(pageText).append("<<ENDPDFPAGE>>
-");
+                result.append("<<PDFPAGE ").append(pageW).append(" ").append(pageH).append(" ").append(w).append(" ").append(h).append(">>\\n");
+                result.append(pageText).append("<<ENDPDFPAGE>>\\n");
             }
         }
         r.close();f.delete();
@@ -662,9 +660,7 @@ public class MainActivity extends AppCompatActivity {
         StringBuilder out=new StringBuilder();
         for(LayoutLine l:lines){
             out.append("<<L ").append(l.x).append(" ").append(l.y).append(" ").append(l.w).append(" ").append(l.h).append(">>");
-            out.append(l.text.replace("
-"," ").replace(""," ")).append("
-");
+            out.append(l.text.replace("\\n"," ").replace("\\r"," ")).append("\\n");
         }
         return out.toString();
     }
