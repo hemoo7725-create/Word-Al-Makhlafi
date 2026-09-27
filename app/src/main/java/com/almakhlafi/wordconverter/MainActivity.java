@@ -71,7 +71,7 @@ public class MainActivity extends AppCompatActivity {
 
         LinearLayout page=new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        page.setPadding(dp(14),dp(12),dp(14),dp(16));
+        page.setPadding(dp(10),dp(8),dp(10),dp(10));
         page.setBackgroundColor(bg());
 
         // 1) Professional green header — one title, one salawat control, no duplicates.
@@ -87,11 +87,11 @@ public class MainActivity extends AppCompatActivity {
         TextView logo=new TextView(this);
         logo.setText("W");
         logo.setTextColor(greenDark());
-        logo.setTextSize(26);
+        logo.setTextSize(23);
         logo.setTypeface(null,Typeface.BOLD);
         logo.setGravity(Gravity.CENTER);
         logo.setBackground(gradient(Color.WHITE,Color.rgb(225,255,243),dp(17)));
-        h.addView(logo,new LinearLayout.LayoutParams(dp(58),dp(58)));
+        h.addView(logo,new LinearLayout.LayoutParams(dp(52),dp(52)));
 
         LinearLayout titleBox=new LinearLayout(this);
         titleBox.setOrientation(LinearLayout.VERTICAL);
@@ -99,19 +99,19 @@ public class MainActivity extends AppCompatActivity {
         TextView title=new TextView(this);
         title.setText("W-المخلافي");
         title.setTextColor(Color.WHITE);
-        title.setTextSize(24);
+        title.setTextSize(21);
         title.setTypeface(null,Typeface.BOLD);
         title.setGravity(Gravity.RIGHT);
         title.setSingleLine(true);
         TextView sub=new TextView(this);
         sub.setText("تحويل الملفات والمستندات");
         sub.setTextColor(Color.rgb(220,250,237));
-        sub.setTextSize(13);
+        sub.setTextSize(11);
         sub.setGravity(Gravity.RIGHT);
         sub.setSingleLine(true);
         titleBox.addView(title,new LinearLayout.LayoutParams(-1,dp(34)));
         titleBox.addView(sub,new LinearLayout.LayoutParams(-1,dp(25)));
-        LinearLayout.LayoutParams tbp=new LinearLayout.LayoutParams(0,dp(64),1);
+        LinearLayout.LayoutParams tbp=new LinearLayout.LayoutParams(0,dp(58),1);
         tbp.setMargins(dp(9),0,dp(7),0);
         h.addView(titleBox,tbp);
 
@@ -127,9 +127,9 @@ public class MainActivity extends AppCompatActivity {
         salawat.setPadding(dp(4),0,dp(4),0);
         salawat.setBackground(gradient(Color.WHITE,Color.rgb(226,248,239),dp(16)));
         salawat.setOnClickListener(v->toast("اللهم صلِّ على محمد وعلى آله الطيبين الطاهرين"));
-        h.addView(salawat,new LinearLayout.LayoutParams(dp(122),dp(48)));
+        h.addView(salawat,new LinearLayout.LayoutParams(dp(108),dp(44)));
         hero.addView(h);
-        page.addView(hero,new LinearLayout.LayoutParams(-1,dp(84)));
+        page.addView(hero,new LinearLayout.LayoutParams(-1,dp(70)));
 
         // 2) One explanatory conversion panel.
         MaterialCardView intro=card();
@@ -139,35 +139,35 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout ib=new LinearLayout(this);
         ib.setOrientation(LinearLayout.HORIZONTAL);
         ib.setGravity(Gravity.CENTER_VERTICAL);
-        ib.setPadding(dp(12),dp(10),dp(12),dp(10));
+        ib.setPadding(dp(9),dp(8),dp(9),dp(8));
 
         TextView docIcon=new TextView(this);
         docIcon.setText("▤  ➜  W");
         docIcon.setTextSize(23);
         docIcon.setTextColor(greenDark());
         docIcon.setGravity(Gravity.CENTER);
-        ib.addView(docIcon,new LinearLayout.LayoutParams(dp(118),-1));
+        ib.addView(docIcon,new LinearLayout.LayoutParams(dp(92),-1));
 
         LinearLayout it=new LinearLayout(this);
         it.setOrientation(LinearLayout.VERTICAL);
         it.setGravity(Gravity.CENTER_VERTICAL|Gravity.RIGHT);
         TextView it1=new TextView(this);
         it1.setText("تحويل أي ملف أو صورة");
-        it1.setTextSize(21);
+        it1.setTextSize(18);
         it1.setTypeface(null,Typeface.BOLD);
         it1.setTextColor(greenDark());
         it1.setGravity(Gravity.RIGHT);
         it1.setSingleLine(true);
         TextView it2=new TextView(this);
         it2.setText("إلى ملف Word قابل للتعديل");
-        it2.setTextSize(18);
+        it2.setTextSize(15);
         it2.setTypeface(null,Typeface.BOLD);
         it2.setTextColor(greenDark());
         it2.setGravity(Gravity.RIGHT);
         it2.setSingleLine(true);
         TextView it3=new TextView(this);
         it3.setText("بجودة عالية ودقة في استخراج النصوص");
-        it3.setTextSize(12);
+        it3.setTextSize(11);
         it3.setTextColor(Color.rgb(75,111,96));
         it3.setGravity(Gravity.RIGHT);
         it.addView(it1,new LinearLayout.LayoutParams(-1,dp(34)));
@@ -175,7 +175,7 @@ public class MainActivity extends AppCompatActivity {
         it.addView(it3,new LinearLayout.LayoutParams(-1,dp(28)));
         ib.addView(it,new LinearLayout.LayoutParams(0,-1,1));
         intro.addView(ib);
-        LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(-1,dp(154));
+        LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(-1,dp(140));
         ip.setMargins(0,dp(12),0,dp(12));
         page.addView(intro,ip);
 
@@ -189,7 +189,7 @@ public class MainActivity extends AppCompatActivity {
         importCard.setOnClickListener(v->pick());
         cameraCard.setOnClickListener(v->camera());
         convertCard.setOnClickListener(v->createOutput());
-        LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,dp(188),1);
+        LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,dp(196),1);
         cp.setMargins(dp(3),0,dp(3),0);
         actions.addView(importCard,cp);
         actions.addView(cameraCard,cp);
@@ -212,7 +212,7 @@ public class MainActivity extends AppCompatActivity {
         filesBox.addView(fileScroll,new LinearLayout.LayoutParams(-1,dp(112)));
         selectedCard.addView(filesBox);
         selectedCard.setVisibility(View.GONE);
-        LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(-1,dp(160));
+        LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(-1,dp(150));
         fp.setMargins(0,dp(10),0,dp(0));
         page.addView(selectedCard,fp);
 
@@ -242,23 +242,23 @@ public class MainActivity extends AppCompatActivity {
         sb.setPadding(dp(14),dp(8),dp(14),dp(8));
         TextView gear=new TextView(this);
         gear.setText("⚙");
-        gear.setTextSize(32);
+        gear.setTextSize(28);
         gear.setTextColor(Color.WHITE);
         gear.setGravity(Gravity.CENTER);
         gear.setBackground(gradient(greenDark(),green(),dp(35)));
-        sb.addView(gear,new LinearLayout.LayoutParams(dp(70),dp(70)));
+        sb.addView(gear,new LinearLayout.LayoutParams(dp(58),dp(58)));
         LinearLayout st=new LinearLayout(this);
         st.setOrientation(LinearLayout.VERTICAL);
         st.setGravity(Gravity.CENTER_VERTICAL|Gravity.RIGHT);
         TextView st1=new TextView(this);
         st1.setText("الإعدادات");
-        st1.setTextSize(21);
+        st1.setTextSize(18);
         st1.setTypeface(null,Typeface.BOLD);
         st1.setTextColor(greenDark());
         st1.setGravity(Gravity.RIGHT);
         TextView st2=new TextView(this);
         st2.setText("تخصيص تجربة الاستخدام");
-        st2.setTextSize(12);
+        st2.setTextSize(11);
         st2.setTextColor(Color.rgb(75,111,96));
         st2.setGravity(Gravity.RIGHT);
         st.addView(st1,new LinearLayout.LayoutParams(-1,dp(34)));
@@ -266,7 +266,7 @@ public class MainActivity extends AppCompatActivity {
         sb.addView(st,new LinearLayout.LayoutParams(0,-1,1));
         settingsCard.addView(sb);
         settingsCard.setOnClickListener(v->settingsDialog());
-        LinearLayout.LayoutParams setp=new LinearLayout.LayoutParams(-1,dp(98));
+        LinearLayout.LayoutParams setp=new LinearLayout.LayoutParams(-1,dp(88));
         setp.setMargins(0,dp(12),0,dp(6));
         page.addView(settingsCard,setp);
 
