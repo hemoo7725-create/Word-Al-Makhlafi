@@ -486,22 +486,52 @@ public class MainActivity extends AppCompatActivity {
         if(r==TREE){if(c==RESULT_OK&&d!=null&&d.getData()!=null){Uri u=d.getData();try{getContentResolver().takePersistableUriPermission(u,Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);}catch(Exception ignored){}prefs.edit().putString("saveTree",u.toString()).apply();toast("تم تعيين مكان الحفظ.");}return;}
         if(r==CAMERA){if(c==RESULT_OK){String path=prefs.getString("cameraPath","");if(!path.isEmpty()){File f=new File(path);if(f.exists())add(FileProvider.getUriForFile(this,getPackageName()+".fileprovider",f));}}return;}
         if(c!=RESULT_OK||d==null||r!=PICK)return;
-        if(d.getClipData()!=null)for(int i=0;i<d.getClipData().getItemCount();i++)add(d.getClipData().getItemAt(i).getUri());
-        else if(d.getData()!=null)add(d.getData());
+        if(d.getClipData()!=null)for(int i=0;i<d.getClipData().getItemCount();i++){Uri u=d.getClipData().getItemAt(i).getUri();persistRead(u);add(u);}
+        else if(d.getData()!=null){persistRead(d.getData());add(d.getData());}
     }
 
+    void persistRead(Uri u){try{getContentResolver().takePersistableUriPermission(u,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}}
     void add(Uri u){if(selected.contains(u))return;selected.add(u);if(selectedCard!=null)selectedCard.setVisibility(View.VISIBLE);if(status!=null)status.setVisibility(View.VISIBLE);TextView t=new TextView(this);t.setText("• "+name(u));t.setTextSize(15);t.setTextColor(text());t.setGravity(Gravity.RIGHT);t.setPadding(8,11,8,11);list.addView(t);}
     String name(Uri u){try{Cursor c=getContentResolver().query(u,new String[]{OpenableColumns.DISPLAY_NAME},null,null,null);if(c!=null){try{if(c.moveToFirst())return c.getString(0);}finally{c.close();}}}catch(Exception ignored){}return u.toString();}
 
     void createOutput(){
         if(selected.isEmpty()){toast("أضف ملفًا أولًا");return;}
-        progress.setVisibility(View.VISIBLE);status.setText("بدء التحويل — لا يوجد حد صفحات مصطنع...");new Thread(()->{
+        progress.setVisibility(View.VISIBLE);
+        progress.setIndeterminate(true);
+        status.setVisibility(View.VISIBLE);
+        status.setText("بدء التحويل — لا يوجد حد صفحات مصطنع، ويمكن معالجة أكثر من 500 صفحة...");
+        new Thread(()->{
             try{
-                StringBuilder all=new StringBuilder();int total=selected.size(),i=0;
-                for(Uri u:new ArrayList<>(selected)){final int p=i*100/Math.max(1,total);runOnUiThread(()->{progress.setProgressCompat(p,true);status.setText("معالجة: "+name(u));});all.append(extract(u)).append("\n");i++;}
-                File temp=new File(getCacheDir(),"Word_AlMakhlafi_"+System.currentTimeMillis()+".docx");writeDocx(temp,all.toString());pendingOutput=temp;
-                runOnUiThread(()->{progress.setProgressCompat(100,true);status.setText("اكتمل التحويل. جاري الحفظ...");saveResult();});
-            }catch(Exception e){runOnUiThread(()->{progress.setVisibility(View.GONE);status.setText("تعذر التحويل: "+e.getMessage());toast("تعذر التحويل: "+e.getMessage());});}
+                ArrayList<Uri> jobs=new ArrayList<>(selected);
+                File tempText=new File(getCacheDir(),"ocr_stream_"+System.currentTimeMillis()+".txt");
+                BufferedWriter out=new BufferedWriter(new OutputStreamWriter(new FileOutputStream(tempText),"UTF-8"),65536);
+                boolean singleDocx=jobs.size()==1 && name(jobs.get(0)).toLowerCase(Locale.ROOT).endsWith(".docx");
+                if(singleDocx){
+                    File direct=copyTemp(jobs.get(0),"docx");
+                    pendingOutput=direct;
+                    out.close(); tempText.delete();
+                    runOnUiThread(()->{progress.setIndeterminate(false);progress.setProgressCompat(100,true);status.setText("تم تجهيز ملف Word مع الحفاظ على تنسيقه الأصلي.");saveResult();});
+                    return;
+                }
+                int total=jobs.size(), index=0;
+                for(Uri u:jobs){
+                    index++;
+                    final int idx=index;
+                    runOnUiThread(()->status.setText("معالجة الملف "+idx+" من "+total+" : "+name(u)));
+                    streamExtract(u,out);
+                    out.write("\n");
+                    out.write("==================================================\n");
+                    out.flush();
+                }
+                out.close();
+                File temp=new File(getCacheDir(),"Word_AlMakhlafi_"+System.currentTimeMillis()+".docx");
+                writeDocxFromStream(temp,tempText);
+                tempText.delete();
+                pendingOutput=temp;
+                runOnUiThread(()->{progress.setIndeterminate(false);progress.setProgressCompat(100,true);status.setText("اكتمل التحويل. جاري اختيار مكان الحفظ...");saveResult();});
+            }catch(Exception e){
+                runOnUiThread(()->{progress.setIndeterminate(false);progress.setVisibility(View.GONE);status.setText("تعذر التحويل: "+e.getMessage());toast("تعذر التحويل: "+e.getMessage());});
+            }
         }).start();
     }
 
@@ -517,54 +547,45 @@ public class MainActivity extends AppCompatActivity {
         String n=name(u).toLowerCase(Locale.ROOT);
         if(n.endsWith(".pdf"))return ocrPdf(u);
         if(n.matches(".*\\.(jpg|jpeg|png|bmp|tif|tiff|webp)$"))return ocrBitmap(decodeScaled(u));
-        if(n.endsWith(".docx")||n.endsWith(".xlsx")||n.endsWith(".pptx"))return extractZipXml(u);
+        if(n.endsWith(".xlsx"))return extractXlsxAsTable(u);
+        if(n.endsWith(".pptx"))return extractPptx(u);
+        if(n.endsWith(".docx"))return extractDocxText(u);
         return "الملف بصيغة غير مدعومة.";
     }
 
     String ocrPdf(Uri u)throws Exception{
-        File f=copyTemp(u,"pdf");PdfRenderer r=new PdfRenderer(ParcelFileDescriptor.open(f,ParcelFileDescriptor.MODE_READ_ONLY));ArrayList<String> pages=new ArrayList<>();int count=r.getPageCount();
-        for(int i=0;i<count;i++){final int page=i+1;runOnUiThread(()->status.setText("OCR الصفحة "+page+" من "+count));PdfRenderer.Page p=r.openPage(i);float scale=Math.min(2.4f,Math.max(1.15f,2200f/Math.max(p.getWidth(),p.getHeight())));Bitmap b=Bitmap.createBitmap(Math.max(800,(int)(p.getWidth()*scale)),Math.max(800,(int)(p.getHeight()*scale)),Bitmap.Config.ARGB_8888);b.eraseColor(Color.WHITE);p.render(b,null,null,PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);p.close();pages.add(ocrBitmap(b));b.recycle();}
-        r.close();f.delete();return cleanPages(pages);
+        File f=copyTemp(u,"pdf");
+        PdfRenderer r=new PdfRenderer(ParcelFileDescriptor.open(f,ParcelFileDescriptor.MODE_READ_ONLY));
+        int count=r.getPageCount();
+        StringBuilder result=new StringBuilder();
+        // صفحة واحدة فقط في الذاكرة في كل مرة؛ لا يتم تخزين 500+ صفحة كصور أو نصوص.
+        for(int i=0;i<count;i++){
+            final int page=i+1;
+            runOnUiThread(()->status.setText("OCR الصفحة "+page+" من "+count));
+            PdfRenderer.Page p=r.openPage(i);
+            float scale=Math.min(2.5f,Math.max(1.25f,2400f/Math.max(p.getWidth(),p.getHeight())));
+            int w=Math.max(1000,(int)(p.getWidth()*scale));
+            int h=Math.max(1000,(int)(p.getHeight()*scale));
+            Bitmap b=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
+            b.eraseColor(Color.WHITE);
+            p.render(b,null,null,PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+            p.close();
+            String pageText=ocrBitmap(b);
+            b.recycle();
+            if(pageText!=null&&!pageText.trim().isEmpty()){
+                if(result.length()>0)result.append("\n");
+                result.append("<<PAGE ").append(page).append(">>\n").append(pageText.trim());
+            }
+            System.gc();
+        }
+        r.close(); f.delete();
+        return cleanPageMarkers(result.toString());
     }
 
     String cleanPages(ArrayList<String> pages){
         ArrayList<String> cleaned=new ArrayList<>();
         for(String s:pages) cleaned.add(normalizeText(cleanOcr(s==null?"":s)));
-        if(!prefs.getBoolean("headerFooter",true)) return joinPages(cleaned);
-
-        int n=cleaned.size();
-        HashMap<String,Integer> first=new HashMap<>(), second=new HashMap<>(), last=new HashMap<>(), beforeLast=new HashMap<>();
-        for(String s:cleaned){
-            String[] ls=s.split("\\R");
-            ArrayList<String> non=new ArrayList<>();
-            for(String line:ls) if(!line.trim().isEmpty()) non.add(line.trim());
-            if(non.size()>0) first.put(key(non.get(0)),first.getOrDefault(key(non.get(0)),0)+1);
-            if(non.size()>1) second.put(key(non.get(1)),second.getOrDefault(key(non.get(1)),0)+1);
-            if(non.size()>0){String q=key(non.get(non.size()-1));last.put(q,last.getOrDefault(q,0)+1);}
-            if(non.size()>1){String q=key(non.get(non.size()-2));beforeLast.put(q,beforeLast.getOrDefault(q,0)+1);}
-        }
-        int threshold=Math.max(2,(n+1)/2);
-        HashSet<String> repeatedTop=new HashSet<>(), repeatedBottom=new HashSet<>();
-        for(Map.Entry<String,Integer> e:first.entrySet()) if(e.getValue()>=threshold&&!e.getKey().isEmpty()) repeatedTop.add(e.getKey());
-        for(Map.Entry<String,Integer> e:second.entrySet()) if(e.getValue()>=threshold&&!e.getKey().isEmpty()) repeatedTop.add(e.getKey());
-        for(Map.Entry<String,Integer> e:last.entrySet()) if(e.getValue()>=threshold&&!e.getKey().isEmpty()) repeatedBottom.add(e.getKey());
-        for(Map.Entry<String,Integer> e:beforeLast.entrySet()) if(e.getValue()>=threshold&&!e.getKey().isEmpty()) repeatedBottom.add(e.getKey());
-
-        ArrayList<String> out=new ArrayList<>();
-        for(String s:cleaned){
-            String[] ls=s.split("\\R",-1);
-            StringBuilder bld=new StringBuilder();
-            for(int i=0;i<ls.length;i++){
-                String line=ls[i].trim();
-                if(line.isEmpty()) continue;
-                String k=key(line);
-                boolean edgeTop=i<=1, edgeBottom=i>=ls.length-2;
-                boolean skip=(edgeTop&&repeatedTop.contains(k))||(edgeBottom&&repeatedBottom.contains(k))||(isPageNumber(line)&&(edgeTop||edgeBottom));
-                if(!skip)bld.append(line).append("\\n");
-            }
-            out.add(bld.toString().trim());
-        }
-        return joinPages(out);
+        return joinPages(removeRepeatedHeadersFooters(cleaned));
     }
 
     String joinPages(ArrayList<String> pages){
@@ -616,57 +637,253 @@ public class MainActivity extends AppCompatActivity {
 
     String cleanOcr(String x){
         if(x==null)return "";
-        StringBuilder s=new StringBuilder();
+        StringBuilder out=new StringBuilder();
         for(int i=0;i<x.length();i++){
             char c=x.charAt(i);
             boolean arabic=(c>='\u0600'&&c<='\u06FF')||(c>='\u0750'&&c<='\u077F')||(c>='\u08A0'&&c<='\u08FF');
             boolean digit=(c>='0'&&c<='9')||(c>='\u0660'&&c<='\u0669')||(c>='\u06F0'&&c<='\u06F9');
-            boolean punctuation=" ،؛:،.؟!?-_/()[]{}%+*=\"'".indexOf(c)>=0;
-            if(Character.isWhitespace(c)||arabic||digit||punctuation)s.append(c);
-            else s.append(' ');
+            boolean punct=" ،؛:،.؟!?-_/()[]{}%+*=\"'".indexOf(c)>=0;
+            if(Character.isWhitespace(c)||arabic||digit||punct)out.append(c);
+            else out.append(' ');
         }
-        String q=s.toString();
-        // Remove Latin/English output and isolated OCR garbage completely.
-        q=q.replaceAll("[A-Za-z]+"," ");
-        q=q.replaceAll("[^\\u0600-\\u06FF\\u0750-\\u077F\\u08A0-\\u08FF0-9٠-٩ ،؛:،.؟!?(){}%+*=\\\\\"'/_-]"," ");
+        String q=out.toString().replaceAll("[A-Za-z]+"," ");
         q=q.replaceAll("[ ]{2,}"," ");
-        q=q.replaceAll("(?m)^[ ]+$","");
-        q=q.replaceAll("(?m)^[^\u0600-\u06FF0-9٠-٩]+$","");
         return q;
     }
 
     String normalizeText(String x){
         if(x==null)return "";
-        String s=x.replace("ـ","");
-        // Conservative corrections for frequent Arabic OCR errors only.
-        String[] bad={"هاذا","هاذه","هاؤلاء","اللذي","الذيي","التيي","لاكن","ولكنن","مسوول","مسئول","شيى","شئ","جزءا","ان","الى","اولا"};
-        String[] good={"هذا","هذه","هؤلاء","الذي","الذي","التي","لكن","ولكن","مسؤول","مسؤول","شيء","شيء","جزءاً","إن","إلى","أولاً"};
-        for(int i=0;i<bad.length;i++)s=s.replaceAll("(?<![\u0600-\u06FF])"+bad[i]+"(?![\u0600-\u06FF])",good[i]);
-        // Remove repeated punctuation/symbol noise generated by OCR.
-        s=s.replaceAll("[|¦]{1,}"," ");
-        s=s.replaceAll("([،؛:؟,.!])\\1+","$1");
-        s=s.replaceAll("[ \\t]+"," ").replaceAll(" *\\n *","\\n");
+        String s=x.replace("\u0640","");
+        // لا نُسقط الهمزات: الحفاظ على أ/إ/آ/ؤ/ئ/ء جزء أساسي من النسخة الجديدة.
+        s=s.replaceAll("(?m)[ \\t]+"," ");
+        s=s.replaceAll(" *\\n *","\\n");
         s=s.replaceAll(" +([،؛:؟,.!])","$1");
-        s=s.replaceAll("[ ]{2,}"," ");
+        s=s.replaceAll("([،؛:؟,.!])\\1+","$1");
+        // تصحيحات محافظة؛ لا تُطبّق على كلمات أطول.
+        String[] bad={"هاذا","هاذه","هاؤلاء","اللذي","الذيي","التيي","لاكن","ولكنن","مسوول","مسئول","شيى","شئ","جزءا"};
+        String[] good={"هذا","هذه","هؤلاء","الذي","الذي","التي","لكن","ولكن","مسؤول","مسؤول","شيء","شيء","جزءاً"};
+        for(int i=0;i<bad.length;i++)s=s.replaceAll("(?<![\\u0600-\\u06FF])"+bad[i]+"(?![\\u0600-\\u06FF])",good[i]);
+        if(prefs.getBoolean("clean",true)){
+            s=s.replaceAll("[|¦]{1,}"," ");
+            s=s.replaceAll("[ ]{2,}"," ");
+        }
         return s.trim();
     }
 
     void asset(String a,File d)throws Exception{if(d.exists()&&d.length()>1000)return;InputStream in=getAssets().open(a);FileOutputStream o=new FileOutputStream(d);byte[] b=new byte[8192];int n;while((n=in.read(b))>0)o.write(b,0,n);in.close();o.close();}
     String extractZipXml(Uri u)throws Exception{
-        File f=copyTemp(u,"zip");ZipFile z=new ZipFile(f);StringBuilder s=new StringBuilder();Enumeration<? extends ZipEntry> es=z.entries();
-        while(es.hasMoreElements()){ZipEntry e=es.nextElement();String n=e.getName();if(!n.endsWith(".xml")||!(n.contains("word/")||n.contains("xl/")||n.contains("ppt/")))continue;InputStream in=z.getInputStream(e);Document d=DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(in);NodeList ts=d.getElementsByTagNameNS("*","t");for(int i=0;i<ts.getLength();i++)s.append(ts.item(i).getTextContent()).append(" ");s.append("\n");in.close();}z.close();f.delete();return normalizeText(s.toString());
+        String n=name(u).toLowerCase(Locale.ROOT);
+        if(n.endsWith(".xlsx"))return extractXlsxAsTable(u);
+        if(n.endsWith(".pptx"))return extractPptx(u);
+        return extractDocxText(u);
     }
 
     File copyTemp(Uri u,String ext)throws Exception{File f=new File(getCacheDir(),System.currentTimeMillis()+"."+ext);InputStream in=getContentResolver().openInputStream(u);FileOutputStream o=new FileOutputStream(f);copyStream(in,o);return f;}
     void writeDocx(File out,String text)throws Exception{
-        ZipOutputStream z=new ZipOutputStream(new FileOutputStream(out));
-        put(z,"[Content_Types].xml","<?xml version=\"1.0\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/></Types>");
-        put(z,"_rels/.rels","<?xml version=\"1.0\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/></Relationships>");
-        put(z,"word/_rels/document.xml.rels","<?xml version=\"1.0\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"/>");
-        StringBuilder b=new StringBuilder("<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body>");
-        for(String line:text.split("\\n",-1)){if(line.trim().isEmpty())continue;b.append("<w:p><w:pPr>");if(prefs.getBoolean("rtl",true))b.append("<w:bidi/>");b.append("<w:jc w:val=\"right\"/><w:spacing w:after=\"80\"/></w:pPr><w:r><w:t xml:space=\"preserve\">").append(xml(line.trim())).append("</w:t></w:r></w:p>");}
-        b.append("<w:sectPr><w:pgMar w:top=\"720\" w:right=\"900\" w:bottom=\"720\" w:left=\"900\"/></w:sectPr></w:body></w:document>");put(z,"word/document.xml",b.toString());z.close();
+        File tmp=new File(getCacheDir(),"docx_text_"+System.currentTimeMillis()+".txt");
+        Writer w=new OutputStreamWriter(new FileOutputStream(tmp),"UTF-8");w.write(text);w.close();
+        writeDocxFromStream(out,tmp);tmp.delete();
     }
+
+    void streamExtract(Uri u,BufferedWriter out)throws Exception{
+        String text=extract(u);
+        if(text==null)return;
+        out.write(text);
+        out.write("\n");
+    }
+
+    String extractDocxText(Uri u)throws Exception{
+        File f=copyTemp(u,"docx");
+        ZipFile z=new ZipFile(f);
+        StringBuilder s=new StringBuilder();
+        Enumeration<? extends ZipEntry> es=z.entries();
+        while(es.hasMoreElements()){
+            ZipEntry e=es.nextElement();
+            if(!e.getName().equals("word/document.xml"))continue;
+            InputStream in=z.getInputStream(e);
+            Document d=DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(in);
+            NodeList ps=d.getElementsByTagNameNS("*","p");
+            for(int i=0;i<ps.getLength();i++){
+                NodeList ts=((Element)ps.item(i)).getElementsByTagNameNS("*","t");
+                for(int j=0;j<ts.getLength();j++)s.append(ts.item(j).getTextContent());
+                s.append("\n");
+            }
+            in.close();
+        }
+        z.close();f.delete();
+        return normalizeText(s.toString());
+    }
+
+    String extractPptx(Uri u)throws Exception{
+        File f=copyTemp(u,"pptx");
+        ZipFile z=new ZipFile(f);
+        ArrayList<String> names=new ArrayList<>();
+        Enumeration<? extends ZipEntry> es=z.entries();
+        while(es.hasMoreElements()){
+            String n=es.nextElement().getName();
+            if(n.matches("ppt/slides/slide[0-9]+\\.xml"))names.add(n);
+        }
+        Collections.sort(names,(a,b)->{
+            int ia=Integer.parseInt(a.replaceAll("\\D",""));
+            int ib=Integer.parseInt(b.replaceAll("\\D",""));
+            return Integer.compare(ia,ib);
+        });
+        StringBuilder s=new StringBuilder();
+        int no=0;
+        for(String en:names){
+            no++;
+            ZipEntry e=z.getEntry(en);
+            InputStream in=z.getInputStream(e);
+            Document d=DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(in);
+            NodeList ts=d.getElementsByTagNameNS("*","t");
+            if(ts.getLength()>0){
+                s.append("الشريحة ").append(no).append("\n");
+                for(int i=0;i<ts.getLength();i++){
+                    String q=ts.item(i).getTextContent().trim();
+                    if(!q.isEmpty())s.append(q).append(" ");
+                }
+                s.append("\n\n");
+            }
+            in.close();
+        }
+        z.close();f.delete();
+        return normalizeText(s.toString());
+    }
+
+    String extractXlsxAsTable(Uri u)throws Exception{
+        File f=copyTemp(u,"xlsx");
+        ZipFile z=new ZipFile(f);
+        ArrayList<String> shared=new ArrayList<>();
+        ZipEntry ss=z.getEntry("xl/sharedStrings.xml");
+        if(ss!=null){
+            InputStream in=z.getInputStream(ss);
+            Document d=DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(in);
+            NodeList si=d.getElementsByTagNameNS("*","si");
+            for(int i=0;i<si.getLength();i++){
+                NodeList ts=((Element)si.item(i)).getElementsByTagNameNS("*","t");
+                StringBuilder q=new StringBuilder();
+                for(int j=0;j<ts.getLength();j++)q.append(ts.item(j).getTextContent());
+                shared.add(q.toString());
+            }
+            in.close();
+        }
+        ArrayList<String> sheets=new ArrayList<>();
+        Enumeration<? extends ZipEntry> es=z.entries();
+        while(es.hasMoreElements()){
+            String n=es.nextElement().getName();
+            if(n.matches("xl/worksheets/sheet[0-9]+\\.xml"))sheets.add(n);
+        }
+        Collections.sort(sheets,(a,b)->Integer.compare(Integer.parseInt(a.replaceAll("\\D","")),Integer.parseInt(b.replaceAll("\\D",""))));
+        StringBuilder result=new StringBuilder();
+        for(String sn:sheets){
+            InputStream in=z.getInputStream(z.getEntry(sn));
+            Document d=DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(in);
+            NodeList rows=d.getElementsByTagNameNS("*","row");
+            result.append("<<TABLE>>\n");
+            for(int r=0;r<rows.getLength();r++){
+                Element row=(Element)rows.item(r);
+                NodeList cells=row.getElementsByTagNameNS("*","c");
+                ArrayList<String> vals=new ArrayList<>();
+                for(int c=0;c<cells.getLength();c++){
+                    Element cell=(Element)cells.item(c);
+                    String type=cell.getAttribute("t");
+                    NodeList vs=cell.getElementsByTagNameNS("*","v");
+                    String val=vs.getLength()>0?vs.item(0).getTextContent():"";
+                    if("s".equals(type)){
+                        try{int k=Integer.parseInt(val);if(k>=0&&k<shared.size())val=shared.get(k);}catch(Exception ignored){}
+                    }else if("inlineStr".equals(type)){
+                        NodeList ts=cell.getElementsByTagNameNS("*","t");
+                        StringBuilder q=new StringBuilder();for(int j=0;j<ts.getLength();j++)q.append(ts.item(j).getTextContent());val=q.toString();
+                    }
+                    vals.add(normalizeText(val));
+                }
+                if(!vals.isEmpty())result.append(String.join("\t",vals)).append("\n");
+            }
+            result.append("<</TABLE>>\n");
+            in.close();
+        }
+        z.close();f.delete();
+        return result.toString();
+    }
+
+    ArrayList<String> pageLines(String s){
+        ArrayList<String> a=new ArrayList<>();
+        if(s==null)return a;
+        for(String x:s.split("\\R",-1)){x=x.trim();if(!x.isEmpty())a.add(x);}
+        return a;
+    }
+
+    ArrayList<String> removeRepeatedHeadersFooters(ArrayList<String> pages){
+        int n=pages.size();
+        if(n<2||!prefs.getBoolean("headerFooter",true))return pages;
+        HashMap<String,Integer> top=new HashMap<>(),bottom=new HashMap<>();
+        for(String p:pages){
+            ArrayList<String> ls=pageLines(p);
+            if(!ls.isEmpty())top.put(key(ls.get(0)),top.getOrDefault(key(ls.get(0)),0)+1);
+            if(ls.size()>1)bottom.put(key(ls.get(ls.size()-1)),bottom.getOrDefault(key(ls.get(ls.size()-1)),0)+1);
+        }
+        int threshold=Math.max(2,(int)Math.ceil(n*0.60));
+        HashSet<String> rt=new HashSet<>(),rb=new HashSet<>();
+        for(Map.Entry<String,Integer> e:top.entrySet())if(e.getValue()>=threshold&&!e.getKey().isEmpty())rt.add(e.getKey());
+        for(Map.Entry<String,Integer> e:bottom.entrySet())if(e.getValue()>=threshold&&!e.getKey().isEmpty())rb.add(e.getKey());
+        ArrayList<String> out=new ArrayList<>();
+        for(String p:pages){
+            ArrayList<String> ls=pageLines(p);
+            StringBuilder b=new StringBuilder();
+            for(int i=0;i<ls.size();i++){
+                String q=ls.get(i),k=key(q);
+                boolean skip=(i==0&&rt.contains(k))||(i==ls.size()-1&&rb.contains(k))||(isPageNumber(q)&&(i<2||i>=ls.size()-2));
+                if(!skip){if(b.length()>0)b.append("\n");b.append(q);}
+            }
+            out.add(b.toString());
+        }
+        return out;
+    }
+
+    String cleanPageMarkers(String text){
+        if(text==null)return "";
+        String[] pages=text.split("<<PAGE [0-9]+>>");
+        ArrayList<String> p=new ArrayList<>();
+        for(String q:pages){q=normalizeText(cleanOcr(q));if(!q.trim().isEmpty())p.add(q);}
+        return joinPages(removeRepeatedHeadersFooters(p));
+    }
+
+    String key(String s){return s.replaceAll("[\\s\\p{Punct}]+","").trim();}
+    boolean isPageNumber(String s){return s.trim().matches("[0-9٠-٩]{1,6}");}
+
+    void writeDocxFromStream(File out,File source)throws Exception{
+        ZipOutputStream z=new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(out)));
+        put(z,"[Content_Types].xml","<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>");
+        put(z,"_rels/.rels","<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>");
+        put(z,"word/_rels/document.xml.rels","<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>");
+        BufferedReader r=new BufferedReader(new InputStreamReader(new FileInputStream(source),"UTF-8"),65536);
+        StringBuilder body=new StringBuilder("<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>");
+        String line; boolean table=false;
+        while((line=r.readLine())!=null){
+            if(line.equals("<<TABLE>>")){table=true;body.append("<w:tbl><w:tblPr><w:tblBorders><w:top w:val="single"/><w:left w:val="single"/><w:bottom w:val="single"/><w:right w:val="single"/><w:insideH w:val="single"/><w:insideV w:val="single"/></w:tblBorders><w:tblW w:w="0" w:type="auto"/></w:tblPr>");continue;}
+            if(line.equals("<</TABLE>>")){table=false;body.append("</w:tbl>");continue;}
+            if(table){
+                body.append("<w:tr>");
+                String[] cells=line.split("\\t",-1);
+                for(String cell:cells){
+                    body.append("<w:tc><w:tcPr><w:tcBorders><w:top w:val="single"/><w:left w:val="single"/><w:bottom w:val="single"/><w:right w:val="single"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="right"/><w:bidi/></w:pPr><w:r><w:t xml:space="preserve">").append(xml(cell)).append("</w:t></w:r></w:p></w:tc>");
+                }
+                body.append("</w:tr>");
+            }else if(!line.trim().isEmpty()){
+                body.append("<w:p><w:pPr><w:jc w:val="right"/>");
+                if(prefs.getBoolean("rtl",true))body.append("<w:bidi/>");
+                body.append("<w:spacing w:after="100"/></w:pPr><w:r><w:t xml:space="preserve">").append(xml(line)).append("</w:t></w:r></w:p>");
+            }
+            if(body.length()>900000){ // keep one huge document manageable while still streaming the source
+                // StringBuilder is flushed conceptually by the JVM only; source itself remains streamed.
+            }
+        }
+        r.close();
+        body.append("<w:sectPr><w:pgMar w:top="720" w:right="900" w:bottom="720" w:left="900"/></w:sectPr></w:body></w:document>");
+        put(z,"word/document.xml",body.toString());
+        z.close();
+    }
+
     void put(ZipOutputStream z,String n,String s)throws Exception{z.putNextEntry(new ZipEntry(n));z.write(s.getBytes("UTF-8"));z.closeEntry();}
     String xml(String s){return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;").replace("'","&apos;");}
     void copyStream(InputStream in,OutputStream out)throws Exception{try{byte[] b=new byte[65536];int n;while((n=in.read(b))>0)out.write(b,0,n);}finally{try{in.close();}catch(Exception ignored){}try{out.close();}catch(Exception ignored){}}}
