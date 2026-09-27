@@ -6,6 +6,10 @@ import android.content.*;
 import android.content.res.Configuration;
 import android.graphics.*;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
 import android.graphics.pdf.PdfRenderer;
 import android.net.Uri;
 import android.database.Cursor;
@@ -633,8 +637,17 @@ public class MainActivity extends AppCompatActivity {
                     out.flush();
                 }
                 out.close();
+                if(!fileHasUsableText(tempText)){
+                    tempText.delete();
+                    throw new Exception("تمت معالجة الملف ولكن لم يتم استخراج نص قابل للتحويل إلى Word.");
+                }
                 File temp=new File(getCacheDir(),"Word_AlMakhlafi_"+System.currentTimeMillis()+".docx");
                 writeDocxFromStream(temp,tempText);
+                if(!docxHasText(temp)){
+                    temp.delete();
+                    tempText.delete();
+                    throw new Exception("تعذر إنشاء محتوى Word رغم استخراج النص.");
+                }
                 tempText.delete();
                 pendingOutput=temp;
                 runOnUiThread(()->{progress.setIndeterminate(false);progress.setProgressCompat(100,true);status.setText("اكتمل التحويل. جاري اختيار مكان الحفظ...");saveResult();});
@@ -742,7 +755,10 @@ public class MainActivity extends AppCompatActivity {
         t.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz|¦~\u0060^\\");
         Bitmap prepared=prepareForOcr(b);
         t.setImage(prepared);
-        t.getUTF8Text();
+
+        // مهم: تنفيذ التعرف الكامل أولًا، ثم استخدام ResultIterator لتحديد مواقع الأسطر.
+        // إذا لم يُرجع Tesseract أسطرًا مكانية، نستخدم النص الكامل كخطة احتياطية حتى لا ينتج Word فارغ.
+        String fullText=t.getUTF8Text();
         ResultIterator it=t.getResultIterator();
         ArrayList<LayoutLine> lines=new ArrayList<>();
         if(it!=null){
@@ -753,13 +769,31 @@ public class MainActivity extends AppCompatActivity {
                     Rect rc=it.getBoundingRect(TessBaseAPI.PageIteratorLevel.RIL_TEXTLINE);
                     float conf=it.confidence(TessBaseAPI.PageIteratorLevel.RIL_TEXTLINE);
                     tx=normalizeText(cleanOcr(tx==null?"":tx));
-                    if(!tx.isEmpty()&&rc!=null&&rc.width()>3&&rc.height()>3&&conf>=12){
+                    if(!tx.isEmpty()&&rc!=null&&rc.width()>3&&rc.height()>3&&conf>=5){
                         lines.add(new LayoutLine(tx,rc.left,rc.top,rc.width(),rc.height(),conf));
                     }
                 }
             }while(it.next(TessBaseAPI.PageIteratorLevel.RIL_TEXTLINE));
             it.delete();
         }
+
+        // بعض إصدارات/حالات Tesseract قد تعيد النص بنجاح دون أسطر مكانية.
+        // لا نسقط النص في هذه الحالة؛ ننشئ أسطرًا تقريبية ونمررها إلى Word.
+        if(lines.isEmpty() && fullText!=null){
+            String cleaned=normalizeText(cleanOcr(fullText));
+            String[] fallback=cleaned.split("\\R");
+            int y=40;
+            int lineH=Math.max(45,b.getHeight()/Math.max(12,fallback.length+2));
+            for(String s:fallback){
+                s=s.trim();
+                if(s.isEmpty())continue;
+                int h=Math.min(lineH,Math.max(35,b.getHeight()-y));
+                if(h<=0)break;
+                lines.add(new LayoutLine(s,40,y,Math.max(100,b.getWidth()-80),h,100));
+                y+=lineH;
+            }
+        }
+
         t.recycle();
         if(prepared!=b)prepared.recycle();
         Collections.sort(lines,(a,c)->{
@@ -785,18 +819,16 @@ public class MainActivity extends AppCompatActivity {
 
     Bitmap prepareForOcr(Bitmap src){
         if(src==null)return null;
-        int w=src.getWidth(), h=src.getHeight();
-        Bitmap out=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
-        // معالجة رمادية محافظة حتى لا تضيع النقاط والهمزات والتفاصيل الدقيقة في المسح العربي.
-        for(int y=0;y<h;y++){
-            for(int x=0;x<w;x++){
-                int p=src.getPixel(x,y);
-                int r=Color.red(p),g=Color.green(p),bl=Color.blue(p);
-                int gray=(r*299+g*587+bl*114)/1000;
-                int v=Math.max(0,Math.min(255,(int)((gray-128)*1.18f+128)));
-                out.setPixel(x,y,Color.rgb(v,v,v));
-            }
-        }
+        // نفس فكرة المعالجة الرمادية السابقة، لكن باستخدام Canvas/ColorMatrix
+        // بدل المرور على كل بكسل من Java؛ هذا يقلل زمن التحويل والضغط على الذاكرة.
+        Bitmap out=Bitmap.createBitmap(src.getWidth(),src.getHeight(),Bitmap.Config.ARGB_8888);
+        Canvas canvas=new Canvas(out);
+        ColorMatrix cm=new ColorMatrix();
+        cm.setSaturation(0f);
+        cm.setScale(1.18f,1.18f,1.18f,1f);
+        Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
+        paint.setColorFilter(new ColorMatrixColorFilter(cm));
+        canvas.drawBitmap(src,0,0,paint);
         return out;
     }
     String cleanOcr(String x){
@@ -1132,6 +1164,36 @@ public class MainActivity extends AppCompatActivity {
         body.append("<w:sectPr><w:pgSz w:w='11906' w:h='16838'/><w:pgMar w:top='720' w:right='720' w:bottom='720' w:left='720'/></w:sectPr></w:body></w:document>");
         put(z,"word/document.xml",body.toString());z.close();
     }
+    boolean fileHasUsableText(File f)throws Exception{
+        if(f==null||!f.exists()||f.length()==0)return false;
+        BufferedReader r=new BufferedReader(new InputStreamReader(new FileInputStream(f),"UTF-8"),65536);
+        String line;
+        int useful=0;
+        while((line=r.readLine())!=null){
+            String q=cleanOcr(line);
+            if(!q.trim().isEmpty()) useful++;
+            if(useful>=2){r.close();return true;}
+        }
+        r.close();
+        return useful>0;
+    }
+
+    boolean docxHasText(File f)throws Exception{
+        if(f==null||!f.exists()||f.length()==0)return false;
+        ZipFile z=new ZipFile(f);
+        try{
+            ZipEntry e=z.getEntry("word/document.xml");
+            if(e==null)return false;
+            InputStream in=z.getInputStream(e);
+            ByteArrayOutputStream b=new ByteArrayOutputStream();
+            byte[] buf=new byte[8192]; int n;
+            while((n=in.read(buf))>0)b.write(buf,0,n);
+            in.close();
+            String s=new String(b.toByteArray(),"UTF-8");
+            return s.contains("<w:t") && s.matches("(?s).*<w:t[^>]*>[^<\\s][^<]*</w:t>.*");
+        }finally{z.close();}
+    }
+
     void put(ZipOutputStream z,String n,String s)throws Exception{z.putNextEntry(new ZipEntry(n));z.write(s.getBytes("UTF-8"));z.closeEntry();}
     String xml(String s){return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;").replace("'","&apos;");}
     void copyStream(InputStream in,OutputStream out)throws Exception{try{byte[] b=new byte[65536];int n;while((n=in.read(b))>0)out.write(b,0,n);}finally{try{in.close();}catch(Exception ignored){}try{out.close();}catch(Exception ignored){}}}
