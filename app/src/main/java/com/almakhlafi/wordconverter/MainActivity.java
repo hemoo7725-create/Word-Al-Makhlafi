@@ -561,12 +561,12 @@ public class MainActivity extends AppCompatActivity {
         StringBuilder result=new StringBuilder();
         for(int i=0;i<count;i++){
             final int page=i+1;
-            runOnUiThread(()->status.setText("تحليل تخطيط الصفحة "+page+" من "+count));
+            runOnUiThread(()->status.setText("تحليل النص وتخطيط الصفحة "+page+" من "+count));
             PdfRenderer.Page p=r.openPage(i);
             double pageW=p.getWidth(), pageH=p.getHeight();
-            float scale=Math.min(3.0f,Math.max(1.5f,2600f/Math.max(p.getWidth(),p.getHeight())));
-            int w=Math.max(1200,(int)(p.getWidth()*scale));
-            int h=Math.max(1200,(int)(p.getHeight()*scale));
+            float scale=Math.min(3.0f,Math.max(1.75f,3000f/Math.max(p.getWidth(),p.getHeight())));
+            int w=Math.max(1400,(int)(p.getWidth()*scale));
+            int h=Math.max(1400,(int)(p.getHeight()*scale));
             Bitmap b=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
             b.eraseColor(Color.WHITE);
             p.render(b,null,null,PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
@@ -574,15 +574,15 @@ public class MainActivity extends AppCompatActivity {
             String pageText=ocrBitmapLayout(b);
             b.recycle();
             if(pageText!=null&&!pageText.trim().isEmpty()){
-                result.append("<<PDFPAGE ").append(pageW).append(" ").append(pageH).append(" ").append(w).append(" ").append(h).append(">>\n");
-                result.append(pageText).append("<<ENDPDFPAGE>>\n");
+                result.append("<<PDFPAGE ").append(pageW).append(" ").append(pageH).append(" ").append(w).append(" ").append(h).append(">>
+");
+                result.append(pageText).append("<<ENDPDFPAGE>>
+");
             }
-            System.gc();
         }
         r.close();f.delete();
         return result.toString();
     }
-
     String cleanPages(ArrayList<String> pages){
         ArrayList<String> cleaned=new ArrayList<>();
         for(String s:pages) cleaned.add(normalizeText(cleanOcr(s==null?"":s)));
@@ -612,7 +612,8 @@ public class MainActivity extends AppCompatActivity {
         if(!t.init(getFilesDir().getAbsolutePath(),"ara"))throw new Exception("فشل تشغيل OCR العربي");
         t.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO);
         t.setVariable("preserve_interword_spaces","1");
-        t.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz|¦~\\u0060^\\\\");
+        t.setVariable("user_defined_dpi","300");
+        t.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz|¦~\u0060^\\");
         Bitmap prepared=prepareForOcr(b);
         t.setImage(prepared);
         String x=t.getUTF8Text();
@@ -620,7 +621,6 @@ public class MainActivity extends AppCompatActivity {
         if(prepared!=b)prepared.recycle();
         return normalizeText(cleanOcr(x==null?"":x));
     }
-
     String ocrBitmapLayout(Bitmap b)throws Exception{
         if(b==null)throw new Exception("تعذر قراءة الصفحة");
         File td=new File(getFilesDir(),"tessdata");if(!td.exists())td.mkdirs();
@@ -629,7 +629,8 @@ public class MainActivity extends AppCompatActivity {
         if(!t.init(getFilesDir().getAbsolutePath(),"ara"))throw new Exception("فشل تشغيل OCR العربي");
         t.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO);
         t.setVariable("preserve_interword_spaces","1");
-        t.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz|¦~\\u0060^\\\\");
+        t.setVariable("user_defined_dpi","300");
+        t.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz|¦~\u0060^\\");
         Bitmap prepared=prepareForOcr(b);
         t.setImage(prepared);
         t.getUTF8Text();
@@ -643,7 +644,7 @@ public class MainActivity extends AppCompatActivity {
                     Rect rc=it.getBoundingRect(TessBaseAPI.PageIteratorLevel.RIL_TEXTLINE);
                     float conf=it.confidence(TessBaseAPI.PageIteratorLevel.RIL_TEXTLINE);
                     tx=normalizeText(cleanOcr(tx==null?"":tx));
-                    if(!tx.isEmpty()&&rc!=null&&rc.width()>3&&rc.height()>3&&conf>=18){
+                    if(!tx.isEmpty()&&rc!=null&&rc.width()>3&&rc.height()>3&&conf>=12){
                         lines.add(new LayoutLine(tx,rc.left,rc.top,rc.width(),rc.height(),conf));
                     }
                 }
@@ -654,17 +655,19 @@ public class MainActivity extends AppCompatActivity {
         if(prepared!=b)prepared.recycle();
         Collections.sort(lines,(a,c)->{
             int dy=Math.abs(a.y-c.y);
-            if(dy<=Math.max(10,Math.min(a.h,c.h)/2))return Integer.compare(c.x,a.x);
+            int band=Math.max(10,(int)(Math.min(a.h,c.h)*0.55f));
+            if(dy<=band)return Integer.compare(c.x,a.x);
             return Integer.compare(a.y,c.y);
         });
         StringBuilder out=new StringBuilder();
         for(LayoutLine l:lines){
             out.append("<<L ").append(l.x).append(" ").append(l.y).append(" ").append(l.w).append(" ").append(l.h).append(">>");
-            out.append(l.text.replace("\n"," ").replace("\r"," ")).append("\n");
+            out.append(l.text.replace("
+"," ").replace(""," ")).append("
+");
         }
         return out.toString();
     }
-
     static class LayoutLine{
         String text; int x,y,w,h; float confidence;
         LayoutLine(String t,int x,int y,int w,int h,float c){text=t;this.x=x;this.y=y;this.w=w;this.h=h;confidence=c;}
@@ -674,20 +677,21 @@ public class MainActivity extends AppCompatActivity {
     int currentRenderedHeight=1;
 
     Bitmap prepareForOcr(Bitmap src){
+        if(src==null)return null;
         int w=src.getWidth(), h=src.getHeight();
         Bitmap out=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
+        // معالجة رمادية محافظة حتى لا تضيع النقاط والهمزات والتفاصيل الدقيقة في المسح العربي.
         for(int y=0;y<h;y++){
             for(int x=0;x<w;x++){
                 int p=src.getPixel(x,y);
                 int r=Color.red(p),g=Color.green(p),bl=Color.blue(p);
                 int gray=(r*299+g*587+bl*114)/1000;
-                int v=gray<185?35:255;
+                int v=Math.max(0,Math.min(255,(int)((gray-128)*1.18f+128)));
                 out.setPixel(x,y,Color.rgb(v,v,v));
             }
         }
         return out;
     }
-
     String cleanOcr(String x){
         if(x==null)return "";
         StringBuilder out=new StringBuilder();
@@ -701,29 +705,95 @@ public class MainActivity extends AppCompatActivity {
         String q=out.toString().replaceAll("[A-Za-z]+"," ");
         q=q.replaceAll("[|¦~\\u0060^\\\\]+"," ");
         q=q.replaceAll("([،؛:؟.!-])\\1{2,}","$1");
-        q=q.replaceAll("(?m)^\\s*[|¦~\\u0060^]+\\s*$","");
         q=q.replaceAll("[ ]{2,}"," ");
-        return q;
+        return q.trim();
     }
-
     String normalizeText(String x){
         if(x==null)return "";
         String s=x.replace("\u0640","");
-        // لا نُسقط الهمزات: الحفاظ على أ/إ/آ/ؤ/ئ/ء جزء أساسي من النسخة الجديدة.
         s=s.replaceAll("(?m)[ \\t]+"," ");
         s=s.replaceAll(" *\\n *","\\n");
         s=s.replaceAll(" +([،؛:؟,.!])","$1");
         s=s.replaceAll("([،؛:؟,.!])\\1+","$1");
-        // تصحيحات محافظة؛ لا تُطبّق على كلمات أطول.
         String[] bad={"هاذا","هاذه","هاؤلاء","اللذي","الذيي","التيي","لاكن","ولكنن","مسوول","مسئول","شيى","شئ","جزءا"};
         String[] good={"هذا","هذه","هؤلاء","الذي","الذي","التي","لكن","ولكن","مسؤول","مسؤول","شيء","شيء","جزءاً"};
         for(int i=0;i<bad.length;i++)s=s.replaceAll("(?<![\\u0600-\\u06FF])"+bad[i]+"(?![\\u0600-\\u06FF])",good[i]);
+        s=normalizeDates(s);
         if(prefs.getBoolean("clean",true)){
             s=s.replaceAll("[|¦]{1,}"," ");
             s=s.replaceAll("[ ]{2,}"," ");
         }
         return s.trim();
+    }    String normalizeDates(String s){
+        if(s==null||s.isEmpty())return "";
+        java.util.regex.Pattern p=java.util.regex.Pattern.compile("(?<![0-9٠-٩])(\\d{4}|[٠-٩]{4})[\\\\/-](\\d{1,2}|[٠-٩]{1,2})[\\\\/-](\\d{1,2}|[٠-٩]{1,2})(?![0-9٠-٩])");
+        java.util.regex.Matcher m=p.matcher(s);
+        StringBuffer b=new StringBuffer();
+        while(m.find()){
+            String y=m.group(1),mo=m.group(2),d=m.group(3);
+            m.appendReplacement(b,java.util.regex.Matcher.quoteReplacement(d+"/"+mo+"/"+y));
+        }
+        m.appendTail(b);
+        return b.toString();
     }
+
+    boolean looksLikeListOrNumberedStart(String s){
+        if(s==null)return false;
+        String q=s.trim();
+        return q.matches("^[0-9٠-٩]+[)\\].:؛-].*")
+            || q.matches("^[أ-ي][)\\].:؛-].*")
+            || q.startsWith("•") || q.startsWith("-");
+    }
+
+    boolean sameParagraph(LayoutLine a,LayoutLine b,double pageW,double sy){
+        if(a==null||b==null)return false;
+        double gap=(b.y-(a.y+a.h))*sy;
+        if(gap<0)gap=0;
+        double avgH=((a.h+b.h)/2.0)*sy;
+        if(looksLikeListOrNumberedStart(b.text))return false;
+        return gap <= Math.max(10.0,avgH*1.55);
+    }
+
+    void appendPdfPage(StringBuilder body,ArrayList<LayoutLine> lines,double pageW,double pageH,int renderW,int renderH){
+        if(lines==null||lines.isEmpty())return;
+        double sx=pageW/Math.max(1,renderW), sy=pageH/Math.max(1,renderH);
+        ArrayList<ArrayList<LayoutLine>> paragraphs=new ArrayList<>();
+        ArrayList<LayoutLine> cur=new ArrayList<>();
+        for(LayoutLine l:lines){
+            if(cur.isEmpty())cur.add(l);
+            else if(sameParagraph(cur.get(cur.size()-1),l,pageW,sy))cur.add(l);
+            else{paragraphs.add(cur);cur=new ArrayList<>();cur.add(l);}
+        }
+        if(!cur.isEmpty())paragraphs.add(cur);
+        for(int pi=0;pi<paragraphs.size();pi++){
+            ArrayList<LayoutLine> para=paragraphs.get(pi);
+            LayoutLine first=para.get(0);
+            double firstX=first.x*sx, firstW=first.w*sx;
+            double rightPt=Math.max(0,pageW-(firstX+firstW));
+            int font=(int)Math.max(10,Math.min(22,(first.h*sy)*0.82));
+            int before=0;
+            if(pi>0){
+                LayoutLine pl=paragraphs.get(pi-1).get(paragraphs.get(pi-1).size()-1);
+                double gap=Math.max(0,(first.y-(pl.y+pl.h))*sy);
+                before=(int)Math.min(360,Math.max(0,gap*12));
+            }
+            body.append("<w:p><w:pPr><w:jc w:val='right'/><w:bidi/>");
+            body.append("<w:ind w:right='").append((int)(rightPt*20)).append("'/>");
+            body.append("<w:spacing w:before='").append(before).append("' w:after='0' w:line='").append(Math.max(240,(int)((first.h*sy)*20))).append("' w:lineRule='auto'/></w:pPr>");
+            for(int i=0;i<para.size();i++){
+                LayoutLine l=para.get(i);
+                String tx=normalizeDates(normalizeText(cleanOcr(l.text)));
+                if(tx.isEmpty())continue;
+                int fs=(int)Math.max(10,Math.min(22,(l.h*sy)*0.82));
+                body.append("<w:r><w:rPr><w:rtl/><w:sz w:val='").append(fs*2).append("'/><w:szCs w:val='").append(fs*2).append("'/></w:rPr>");
+                body.append("<w:t xml:space='preserve'>").append(xml(tx)).append("</w:t></w:r>");
+                if(i<para.size()-1)body.append("<w:r><w:br/></w:r>");
+            }
+            body.append("</w:p>");
+        }
+        body.append("<w:p><w:pPr><w:sectPr><w:type w:val='nextPage'/><w:pgSz w:w='").append((int)(pageW*20)).append("' w:h='").append((int)(pageH*20)).append("'/><w:pgMar w:top='360' w:right='360' w:bottom='360' w:left='360'/></w:sectPr></w:pPr></w:p>");
+    }
+
 
     void asset(String a,File d)throws Exception{if(d.exists()&&d.length()>1000)return;InputStream in=getAssets().open(a);FileOutputStream o=new FileOutputStream(d);byte[] b=new byte[8192];int n;while((n=in.read(b))>0)o.write(b,0,n);in.close();o.close();}
     String extractZipXml(Uri u)throws Exception{
@@ -910,53 +980,51 @@ public class MainActivity extends AppCompatActivity {
         put(z,"word/_rels/document.xml.rels","<?xml version='1.0'?><Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'/>");
         BufferedReader r=new BufferedReader(new InputStreamReader(new FileInputStream(source),"UTF-8"),65536);
         StringBuilder body=new StringBuilder("<w:document xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'><w:body>");
-        String line; boolean table=false,pdfPage=false; double pageW=595,pageH=842; int renderW=1,renderH=1; int prevY=-1,prevH=0;
+        String line; boolean table=false,pdfPage=false;
+        double pageW=595,pageH=842; int renderW=1,renderH=1;
+        ArrayList<LayoutLine> pdfLines=new ArrayList<>();
         while((line=r.readLine())!=null){
             if(line.startsWith("<<PDFPAGE ")){
                 String[] a=line.substring(10,line.length()-2).trim().split(" ");
                 if(a.length>=4){pageW=Double.parseDouble(a[0]);pageH=Double.parseDouble(a[1]);renderW=Integer.parseInt(a[2]);renderH=Integer.parseInt(a[3]);}
-                pdfPage=true;prevY=-1;prevH=0;continue;
+                pdfPage=true;pdfLines.clear();continue;
             }
             if(pdfPage&&line.startsWith("<<L ")&&line.contains(">>")){
                 int k=line.indexOf(">>");String[] a=line.substring(4,k).trim().split(" ");
                 if(a.length>=4){
-                    int x=Integer.parseInt(a[0]),y=Integer.parseInt(a[1]),ww=Integer.parseInt(a[2]),hh=Integer.parseInt(a[3]);
-                    String tx=normalizeText(cleanOcr(line.substring(k+2)));
-                    if(!tx.isEmpty()){
-                        double sx=pageW/Math.max(1,renderW),sy=pageH/Math.max(1,renderH);
-                        double xPt=x*sx,yPt=y*sy,wPt=ww*sx,hPt=hh*sy;
-                        double rightPt=Math.max(0,pageW-(xPt+wPt));
-                        double gapPt=prevY<0?Math.max(0,yPt):Math.max(0,yPt-(prevY+prevH)*sy);
-                        int before=(int)Math.min(1800,Math.max(0,gapPt*20));
-                        int font=(int)Math.max(9,Math.min(22,hPt*.82));
-                        String jc=(xPt+wPt/2>pageW*.40&&xPt+wPt/2<pageW*.60)?"center":"right";
-                        body.append("<w:p><w:pPr><w:jc w:val='").append(jc).append("'/><w:bidi/>");
-                        if("right".equals(jc))body.append("<w:ind w:right='").append((int)(rightPt*20)).append("'/>");
-                        body.append("<w:spacing w:before='").append(before).append("' w:after='0' w:line='").append(Math.max(240,(int)(hPt*20))).append("' w:lineRule='exact'/></w:pPr>");
-                        body.append("<w:r><w:rPr><w:rtl/><w:sz w:val='").append(font*2).append("'/><w:szCs w:val='").append(font*2).append("'/></w:rPr><w:t xml:space='preserve'>").append(xml(tx)).append("</w:t></w:r></w:p>");
-                        prevY=y;prevH=hh;
-                    }
+                    try{
+                        int x=Integer.parseInt(a[0]),y=Integer.parseInt(a[1]),ww=Integer.parseInt(a[2]),hh=Integer.parseInt(a[3]);
+                        String tx=normalizeText(cleanOcr(line.substring(k+2)));
+                        if(!tx.isEmpty()&&ww>3&&hh>3)pdfLines.add(new LayoutLine(tx,x,y,ww,hh,100));
+                    }catch(Exception ignored){}
                 }
                 continue;
             }
             if(pdfPage&&line.startsWith("<<ENDPDFPAGE>>")){
-                body.append("<w:p><w:pPr><w:sectPr><w:type w:val='nextPage'/><w:pgSz w:w='").append((int)(pageW*20)).append("' w:h='").append((int)(pageH*20)).append("'/><w:pgMar w:top='360' w:right='360' w:bottom='360' w:left='360'/></w:sectPr></w:pPr></w:p>");
-                pdfPage=false;prevY=-1;prevH=0;continue;
+                appendPdfPage(body,pdfLines,pageW,pageH,renderW,renderH);
+                pdfPage=false;pdfLines.clear();continue;
             }
             if(pdfPage)continue;
-            if(line.equals("<<TABLE>>")){table=true;body.append("<w:tbl><w:tblPr><w:tblBorders><w:top w:val='single'/><w:left w:val='single'/><w:bottom w:val='single'/><w:right w:val='single'/><w:insideH w:val='single'/><w:insideV w:val='single'/></w:tblBorders></w:tblPr>");continue;}
+            if(line.equals("<<TABLE>>")){
+                table=true;
+                body.append("<w:tbl><w:tblPr><w:tblBorders><w:top w:val='single'/><w:left w:val='single'/><w:bottom w:val='single'/><w:right w:val='single'/><w:insideH w:val='single'/><w:insideV w:val='single'/></w:tblBorders></w:tblPr>");
+                continue;
+            }
             if(line.equals("<</TABLE>>")){table=false;body.append("</w:tbl>");continue;}
             if(table){
-                body.append("<w:tr>");for(String cell:line.split("\\t",-1))body.append("<w:tc><w:p><w:pPr><w:jc w:val='right'/><w:bidi/></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t xml:space='preserve'>").append(xml(cell)).append("</w:t></w:r></w:p></w:tc>");body.append("</w:tr>");
+                body.append("<w:tr>");
+                for(String cell:line.split("\\t",-1)){
+                    body.append("<w:tc><w:p><w:pPr><w:jc w:val='right'/><w:bidi/></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t xml:space='preserve'>").append(xml(normalizeDates(normalizeText(cell)))).append("</w:t></w:r></w:p></w:tc>");
+                }
+                body.append("</w:tr>");
             }else if(!line.trim().isEmpty()){
-                body.append("<w:p><w:pPr><w:jc w:val='right'/><w:bidi/></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t xml:space='preserve'>").append(xml(line)).append("</w:t></w:r></w:p>");
+                body.append("<w:p><w:pPr><w:jc w:val='right'/><w:bidi/></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t xml:space='preserve'>").append(xml(normalizeDates(normalizeText(line)))).append("</w:t></w:r></w:p>");
             }
         }
         r.close();
         body.append("<w:sectPr><w:pgSz w:w='11906' w:h='16838'/><w:pgMar w:top='720' w:right='720' w:bottom='720' w:left='720'/></w:sectPr></w:body></w:document>");
         put(z,"word/document.xml",body.toString());z.close();
     }
-
     void put(ZipOutputStream z,String n,String s)throws Exception{z.putNextEntry(new ZipEntry(n));z.write(s.getBytes("UTF-8"));z.closeEntry();}
     String xml(String s){return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;").replace("'","&apos;");}
     void copyStream(InputStream in,OutputStream out)throws Exception{try{byte[] b=new byte[65536];int n;while((n=in.read(b))>0)out.write(b,0,n);}finally{try{in.close();}catch(Exception ignored){}try{out.close();}catch(Exception ignored){}}}
