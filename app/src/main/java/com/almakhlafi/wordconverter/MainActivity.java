@@ -65,155 +65,117 @@ public class MainActivity extends AppCompatActivity {
         root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
 
         ScrollView scroll=new ScrollView(this);
-        scroll.setFillViewport(false);
+        scroll.setFillViewport(true);
         scroll.setVerticalScrollBarEnabled(false);
         scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
 
         LinearLayout page=new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        page.setPadding(dp(10),dp(8),dp(10),dp(10));
+        page.setPadding(dp(10),dp(8),dp(10),dp(14));
         page.setBackgroundColor(bg());
 
-        // 1) Professional green header — one title, one salawat control, no duplicates.
+        // التصميم المبسط المعتمد: رأس أخضر + بطاقة الصلاة + شريط التحويل + أربع أيقونات فقط.
         MaterialCardView hero=card();
         hero.setCardBackgroundColor(greenDark());
         hero.setStrokeWidth(0);
-        hero.setCardElevation(dp(3));
-        LinearLayout h=new LinearLayout(this);
-        h.setOrientation(LinearLayout.HORIZONTAL);
-        h.setGravity(Gravity.CENTER_VERTICAL);
-        h.setPadding(dp(10),dp(9),dp(10),dp(9));
-
-        TextView logo=new TextView(this);
-        logo.setText("W");
-        logo.setTextColor(greenDark());
-        logo.setTextSize(23);
-        logo.setTypeface(null,Typeface.BOLD);
-        logo.setGravity(Gravity.CENTER);
-        logo.setBackground(gradient(Color.WHITE,Color.rgb(225,255,243),dp(17)));
-        h.addView(logo,new LinearLayout.LayoutParams(dp(52),dp(52)));
-
-        LinearLayout titleBox=new LinearLayout(this);
-        titleBox.setOrientation(LinearLayout.VERTICAL);
-        titleBox.setGravity(Gravity.CENTER_VERTICAL|Gravity.RIGHT);
+        hero.setCardElevation(dp(2));
         TextView title=new TextView(this);
         title.setText("W-المخلافي");
         title.setTextColor(Color.WHITE);
-        title.setTextSize(21);
+        title.setTextSize(27);
         title.setTypeface(null,Typeface.BOLD);
-        title.setGravity(Gravity.RIGHT);
+        title.setGravity(Gravity.CENTER|Gravity.RIGHT);
         title.setSingleLine(true);
-        TextView sub=new TextView(this);
-        sub.setText("تحويل الملفات والمستندات");
-        sub.setTextColor(Color.rgb(220,250,237));
-        sub.setTextSize(11);
-        sub.setGravity(Gravity.RIGHT);
-        sub.setSingleLine(true);
-        titleBox.addView(title,new LinearLayout.LayoutParams(-1,dp(34)));
-        titleBox.addView(sub,new LinearLayout.LayoutParams(-1,dp(25)));
-        LinearLayout.LayoutParams tbp=new LinearLayout.LayoutParams(0,dp(58),1);
-        tbp.setMargins(dp(9),0,dp(7),0);
-        h.addView(titleBox,tbp);
+        title.setPadding(dp(10),0,dp(12),0);
+        hero.addView(title,new LinearLayout.LayoutParams(-1,dp(68)));
+        page.addView(hero,new LinearLayout.LayoutParams(-1,dp(76)));
 
-        MaterialButton salawat=new MaterialButton(this);
-        salawat.setText("ﷺ  صلِّ على محمد");
-        salawat.setTextSize(12);
-        salawat.setAllCaps(false);
+        // بطاقة الصلاة كما في التصميم المرسل.
+        MaterialCardView salawatCard=card();
+        salawatCard.setCardBackgroundColor(Color.rgb(232,250,242));
+        salawatCard.setStrokeColor(Color.rgb(198,238,220));
+        salawatCard.setStrokeWidth(dp(1));
+        TextView salawat=new TextView(this);
+        salawat.setText("ﷺ صلِّ على محمد صلى الله عليه وسلم وعلى آله\nالطيبين الطاهرين");
         salawat.setTextColor(greenDark());
+        salawat.setTextSize(20);
         salawat.setTypeface(null,Typeface.BOLD);
         salawat.setGravity(Gravity.CENTER);
-        salawat.setCornerRadius(dp(16));
-        salawat.setInsetTop(0); salawat.setInsetBottom(0);
-        salawat.setPadding(dp(4),0,dp(4),0);
-        salawat.setBackground(gradient(Color.WHITE,Color.rgb(226,248,239),dp(16)));
-        salawat.setOnClickListener(v->toast("اللهم صلِّ على محمد وعلى آله الطيبين الطاهرين"));
-        h.addView(salawat,new LinearLayout.LayoutParams(dp(108),dp(44)));
-        hero.addView(h);
-        page.addView(hero,new LinearLayout.LayoutParams(-1,dp(70)));
+        salawat.setLineSpacing(0,1.0f);
+        salawat.setPadding(dp(8),dp(8),dp(8),dp(8));
+        salawatCard.addView(salawat,new LinearLayout.LayoutParams(-1,dp(112)));
+        page.addView(salawatCard,new LinearLayout.LayoutParams(-1,dp(124)));
 
-        // 2) One explanatory conversion panel.
+        // شريط واحد فقط يشرح الوظيفة، ولا توجد أي أزرار مكررة فوقه.
         MaterialCardView intro=card();
-        intro.setCardBackgroundColor(Color.rgb(232,250,242));
-        intro.setStrokeColor(Color.rgb(198,238,220));
-        intro.setStrokeWidth(dp(1));
-        LinearLayout ib=new LinearLayout(this);
-        ib.setOrientation(LinearLayout.HORIZONTAL);
-        ib.setGravity(Gravity.CENTER_VERTICAL);
-        ib.setPadding(dp(9),dp(8),dp(9),dp(8));
+        intro.setCardBackgroundColor(Color.rgb(35,143,226));
+        intro.setStrokeWidth(0);
+        TextView introText=new TextView(this);
+        introText.setText("تحويل واستخراج جميع\nأنواع الملفات إلى وورد");
+        introText.setTextColor(Color.WHITE);
+        introText.setTextSize(23);
+        introText.setTypeface(null,Typeface.NORMAL);
+        introText.setGravity(Gravity.CENTER);
+        introText.setLineSpacing(0,0.95f);
+        introText.setPadding(dp(6),0,dp(6),0);
+        intro.addView(introText,new LinearLayout.LayoutParams(-1,dp(104)));
+        LinearLayout.LayoutParams introP=new LinearLayout.LayoutParams(-1,dp(108));
+        introP.setMargins(0,dp(12),0,dp(12));
+        page.addView(intro,introP);
 
-        TextView docIcon=new TextView(this);
-        docIcon.setText("▤  ➜  W");
-        docIcon.setTextSize(23);
-        docIcon.setTextColor(greenDark());
-        docIcon.setGravity(Gravity.CENTER);
-        ib.addView(docIcon,new LinearLayout.LayoutParams(dp(92),-1));
-
-        LinearLayout it=new LinearLayout(this);
-        it.setOrientation(LinearLayout.VERTICAL);
-        it.setGravity(Gravity.CENTER_VERTICAL|Gravity.RIGHT);
-        TextView it1=new TextView(this);
-        it1.setText("تحويل أي ملف أو صورة");
-        it1.setTextSize(18);
-        it1.setTypeface(null,Typeface.BOLD);
-        it1.setTextColor(greenDark());
-        it1.setGravity(Gravity.RIGHT);
-        it1.setSingleLine(true);
-        TextView it2=new TextView(this);
-        it2.setText("إلى ملف Word قابل للتعديل");
-        it2.setTextSize(15);
-        it2.setTypeface(null,Typeface.BOLD);
-        it2.setTextColor(greenDark());
-        it2.setGravity(Gravity.RIGHT);
-        it2.setSingleLine(true);
-        TextView it3=new TextView(this);
-        it3.setText("بجودة عالية ودقة في استخراج النصوص");
-        it3.setTextSize(11);
-        it3.setTextColor(Color.rgb(75,111,96));
-        it3.setGravity(Gravity.RIGHT);
-        it.addView(it1,new LinearLayout.LayoutParams(-1,dp(34)));
-        it.addView(it2,new LinearLayout.LayoutParams(-1,dp(32)));
-        it.addView(it3,new LinearLayout.LayoutParams(-1,dp(28)));
-        ib.addView(it,new LinearLayout.LayoutParams(0,-1,1));
-        intro.addView(ib);
-        LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(-1,dp(140));
-        ip.setMargins(0,dp(12),0,dp(12));
-        page.addView(intro,ip);
-
-        // 3) Exactly three primary actions. No duplicate convert/import/camera buttons.
-        LinearLayout actions=new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setGravity(Gravity.CENTER);
-        MaterialCardView importCard=dashboardCard("↑","استيراد ملف","PDF • Word • Excel • PPT\nوصور وغيرها",Color.rgb(246,243,255),Color.rgb(104,63,205));
-        MaterialCardView cameraCard=dashboardCard("●","التقاط صورة","باستخدام الكاميرا",Color.rgb(237,248,255),Color.rgb(20,130,220));
-        MaterialCardView convertCard=dashboardCard("W","تحويل إلى Word","بدء عملية التحويل",Color.rgb(255,249,226),Color.rgb(226,153,18));
-        importCard.setOnClickListener(v->pick());
-        cameraCard.setOnClickListener(v->camera());
-        convertCard.setOnClickListener(v->createOutput());
-        LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,dp(196),1);
-        cp.setMargins(dp(3),0,dp(3),0);
-        actions.addView(importCard,cp);
-        actions.addView(cameraCard,cp);
-        actions.addView(convertCard,cp);
-        page.addView(actions);
-
-        // 4) Selected files/status stay hidden until needed, preventing crowding.
+        // الحاوية الرئيسية: الأيقونات الأربع فقط.
         selectedCard=card();
         selectedCard.setCardBackgroundColor(Color.WHITE);
-        selectedCard.setStrokeColor(Color.rgb(201,232,216));
+        selectedCard.setStrokeColor(Color.rgb(205,225,215));
         selectedCard.setStrokeWidth(dp(1));
+        selectedCard.setCardElevation(dp(2));
+
         LinearLayout filesBox=new LinearLayout(this);
         filesBox.setOrientation(LinearLayout.VERTICAL);
+        filesBox.setPadding(dp(12),dp(8),dp(12),dp(8));
+
         TextView fh=sectionHeader("الملفات المحددة");
-        filesBox.addView(fh,new LinearLayout.LayoutParams(-1,dp(40)));
+        fh.setTextSize(22);
+        fh.setPadding(dp(4),0,dp(4),0);
+        filesBox.addView(fh,new LinearLayout.LayoutParams(-1,dp(52)));
+
+        LinearLayout row1=new LinearLayout(this);
+        row1.setOrientation(LinearLayout.HORIZONTAL);
+        row1.setGravity(Gravity.CENTER);
+        MaterialCardView importCard=actionCard("⇧","استيراد ملف");
+        MaterialCardView cameraCard=actionCard("●","التقاط صورة");
+        importCard.setOnClickListener(v->pick());
+        cameraCard.setOnClickListener(v->camera());
+        LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(0,dp(154),1);
+        ap.setMargins(dp(6),dp(5),dp(6),dp(7));
+        row1.addView(importCard,ap);
+        row1.addView(cameraCard,ap);
+        filesBox.addView(row1);
+
+        LinearLayout row2=new LinearLayout(this);
+        row2.setOrientation(LinearLayout.HORIZONTAL);
+        row2.setGravity(Gravity.CENTER);
+        MaterialCardView convertCard=actionCard("W","التحويل إلى ورد");
+        MaterialCardView settingsCard=actionCard("⚙","الإعدادات");
+        convertCard.setOnClickListener(v->createOutput());
+        settingsCard.setOnClickListener(v->settingsDialog());
+        row2.addView(convertCard,ap);
+        row2.addView(settingsCard,ap);
+        filesBox.addView(row2);
+
+        // قائمة الملفات لا تظهر إلا بعد الاستيراد، حتى تبقى الواجهة مطابقة للتصميم النظيف.
         list=new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
-        ScrollView fileScroll=new ScrollView(this);
-        fileScroll.addView(list);
-        filesBox.addView(fileScroll,new LinearLayout.LayoutParams(-1,dp(112)));
+        list.setPadding(dp(4),dp(4),dp(4),dp(4));
+        filesBox.addView(list,new LinearLayout.LayoutParams(-1,dp(90)));
+
+        TextView empty=sectionHeader("تم مسح القائمة.");
+        empty.setTextSize(17);
+        empty.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+        filesBox.addView(empty,new LinearLayout.LayoutParams(-1,dp(38)));
+
         selectedCard.addView(filesBox);
-        selectedCard.setVisibility(View.GONE);
-        LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(-1,dp(150));
-        fp.setMargins(0,dp(10),0,dp(0));
+        LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(-1,dp(570));
         page.addView(selectedCard,fp);
 
         status=new TextView(this);
@@ -222,70 +184,50 @@ public class MainActivity extends AppCompatActivity {
         status.setTextSize(13);
         status.setTypeface(null,Typeface.BOLD);
         status.setGravity(Gravity.CENTER);
-        status.setBackground(gradient(Color.rgb(231,249,241),Color.WHITE,dp(14)));
         status.setVisibility(View.GONE);
-        page.addView(status,new LinearLayout.LayoutParams(-1,dp(42)));
+        page.addView(status,new LinearLayout.LayoutParams(-1,dp(34)));
 
         progress=new LinearProgressIndicator(this);
         progress.setMax(100);
         progress.setVisibility(View.GONE);
         page.addView(progress,new LinearLayout.LayoutParams(-1,dp(4)));
 
-        // 5) One settings card only.
-        MaterialCardView settingsCard=card();
-        settingsCard.setCardBackgroundColor(Color.rgb(232,250,242));
-        settingsCard.setStrokeColor(Color.rgb(198,238,220));
-        settingsCard.setStrokeWidth(dp(1));
-        LinearLayout sb=new LinearLayout(this);
-        sb.setOrientation(LinearLayout.HORIZONTAL);
-        sb.setGravity(Gravity.CENTER_VERTICAL);
-        sb.setPadding(dp(14),dp(8),dp(14),dp(8));
-        TextView gear=new TextView(this);
-        gear.setText("⚙");
-        gear.setTextSize(28);
-        gear.setTextColor(Color.WHITE);
-        gear.setGravity(Gravity.CENTER);
-        gear.setBackground(gradient(greenDark(),green(),dp(35)));
-        sb.addView(gear,new LinearLayout.LayoutParams(dp(58),dp(58)));
-        LinearLayout st=new LinearLayout(this);
-        st.setOrientation(LinearLayout.VERTICAL);
-        st.setGravity(Gravity.CENTER_VERTICAL|Gravity.RIGHT);
-        TextView st1=new TextView(this);
-        st1.setText("الإعدادات");
-        st1.setTextSize(18);
-        st1.setTypeface(null,Typeface.BOLD);
-        st1.setTextColor(greenDark());
-        st1.setGravity(Gravity.RIGHT);
-        TextView st2=new TextView(this);
-        st2.setText("تخصيص تجربة الاستخدام");
-        st2.setTextSize(11);
-        st2.setTextColor(Color.rgb(75,111,96));
-        st2.setGravity(Gravity.RIGHT);
-        st.addView(st1,new LinearLayout.LayoutParams(-1,dp(34)));
-        st.addView(st2,new LinearLayout.LayoutParams(-1,dp(25)));
-        sb.addView(st,new LinearLayout.LayoutParams(0,-1,1));
-        settingsCard.addView(sb);
-        settingsCard.setOnClickListener(v->settingsDialog());
-        LinearLayout.LayoutParams setp=new LinearLayout.LayoutParams(-1,dp(88));
-        setp.setMargins(0,dp(12),0,dp(6));
-        page.addView(settingsCard,setp);
-
         scroll.addView(page,new ScrollView.LayoutParams(-1,-2));
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
 
-        // 6) Fixed bottom navigation — exactly four destinations, no duplicated commands.
-        LinearLayout nav=new LinearLayout(this);
-        nav.setOrientation(LinearLayout.HORIZONTAL);
-        nav.setGravity(Gravity.CENTER);
-        nav.setPadding(dp(7),dp(5),dp(7),dp(5));
-        nav.setBackground(gradient(Color.WHITE,Color.rgb(246,251,248),dp(20)));
-        nav.setElevation(dp(5));
-        addNav(nav,"⌂","الرئيسية",v->{});
-        addNav(nav,"▥","المكتبة",v->showLibrary());
-        addNav(nav,"◷","السجل",v->toast("السجل سيظهر هنا بعد أول عملية تحويل."));
-        addNav(nav,"•••","المزيد",v->moreMenu(v));
-        root.addView(nav,new LinearLayout.LayoutParams(-1,dp(78)));
+        // لا توجد قائمة سفلية ولا "المزيد/الرئيسية/السجل" — حسب التصميم المرسل.
         return root;
+    }
+
+    MaterialCardView actionCard(String icon,String label){
+        MaterialCardView c=card();
+        c.setCardBackgroundColor(Color.rgb(91,54,180));
+        c.setStrokeColor(Color.rgb(77,43,157));
+        c.setStrokeWidth(dp(1));
+        c.setCardElevation(dp(2));
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER);
+        box.setPadding(dp(6),dp(8),dp(6),dp(7));
+
+        TextView ic=new TextView(this);
+        ic.setText(icon);
+        ic.setTextColor(Color.WHITE);
+        ic.setTextSize(42);
+        ic.setTypeface(null,Typeface.BOLD);
+        ic.setGravity(Gravity.CENTER);
+        box.addView(ic,new LinearLayout.LayoutParams(-1,dp(76)));
+
+        TextView t=new TextView(this);
+        t.setText(label);
+        t.setTextColor(Color.WHITE);
+        t.setTextSize(17);
+        t.setTypeface(null,Typeface.BOLD);
+        t.setGravity(Gravity.CENTER);
+        t.setSingleLine(true);
+        box.addView(t,new LinearLayout.LayoutParams(-1,dp(44)));
+        c.addView(box);
+        return c;
     }
 
     MaterialCardView dashboardCard(String icon,String title,String sub,int fill,int accent){
