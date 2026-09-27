@@ -21,6 +21,7 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.googlecode.tesseract.android.TessBaseAPI;
+import com.googlecode.tesseract.android.ResultIterator;
 import java.io.*;
 import java.util.*;
 import java.util.zip.*;
