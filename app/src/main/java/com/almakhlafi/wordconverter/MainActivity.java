@@ -37,6 +37,8 @@ public class MainActivity extends AppCompatActivity {
     ArrayList<Uri> selected=new ArrayList<>();
     File pendingOutput;
     SharedPreferences prefs;
+    int selectedPdfStartPage=1;
+    int selectedPdfEndPage=-1;
 
     @Override public void onCreate(Bundle b){
         prefs=getSharedPreferences("settings",MODE_PRIVATE);
@@ -497,10 +499,116 @@ public class MainActivity extends AppCompatActivity {
 
     void createOutput(){
         if(selected.isEmpty()){toast("أضف ملفًا أولًا");return;}
+        boolean hasPdf=false;
+        for(Uri u:selected) if(name(u).toLowerCase(Locale.ROOT).endsWith(".pdf")){hasPdf=true;break;}
+        if(hasPdf){showPdfPageSelection();return;}
+        startConversion();
+    }
+
+    void showPdfPageSelection(){
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20),dp(6),dp(20),dp(4));
+
+        TextView h=sectionTitle("اختيار صفحات ملف PDF");
+        h.setTextSize(21);
+        box.addView(h,new LinearLayout.LayoutParams(-1,dp(48)));
+
+        TextView info=new TextView(this);
+        info.setText("اختر تحويل الملف كاملًا أو حدد صفحة واحدة أو نطاقًا مثل: 1-10");
+        info.setTextSize(15);
+        info.setTextColor(text());
+        info.setGravity(Gravity.RIGHT);
+        info.setPadding(4,2,4,12);
+        box.addView(info);
+
+        RadioGroup group=new RadioGroup(this);
+        group.setOrientation(RadioGroup.VERTICAL);
+        group.setGravity(Gravity.RIGHT);
+
+        RadioButton all=new RadioButton(this);
+        all.setText("تحويل جميع الصفحات");
+        all.setTextSize(16);
+        all.setGravity(Gravity.RIGHT);
+        all.setChecked(true);
+
+        RadioButton range=new RadioButton(this);
+        range.setText("تحويل صفحات محددة");
+        range.setTextSize(16);
+        range.setGravity(Gravity.RIGHT);
+
+        group.addView(all);
+        group.addView(range);
+        box.addView(group);
+
+        EditText pages=new EditText(this);
+        pages.setHint("مثال: 1-10 أو 7");
+        pages.setTextSize(17);
+        pages.setSingleLine(true);
+        pages.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+        pages.setGravity(Gravity.RIGHT);
+        pages.setEnabled(false);
+        pages.setPadding(dp(12),dp(8),dp(12),dp(8));
+        box.addView(pages,new LinearLayout.LayoutParams(-1,dp(56)));
+
+        TextView note=new TextView(this);
+        note.setText("مثال: إذا كان الملف 50 صفحة يمكنك كتابة 1-10، أو 15، أو 20-35.");
+        note.setTextSize(13);
+        note.setTextColor(greenDark());
+        note.setGravity(Gravity.RIGHT);
+        note.setPadding(4,dp(8),4,dp(4));
+        box.addView(note);
+
+        all.setOnClickListener(v->pages.setEnabled(false));
+        range.setOnClickListener(v->{pages.setEnabled(true);pages.requestFocus();});
+
+        AlertDialog dlg=new AlertDialog.Builder(this)
+            .setView(box)
+            .setPositiveButton("بدء التحويل",null)
+            .setNegativeButton("إلغاء",null)
+            .create();
+
+        dlg.setOnShowListener(x->dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            if(all.isChecked()){
+                selectedPdfStartPage=1;
+                selectedPdfEndPage=-1;
+                dlg.dismiss();
+                startConversion();
+                return;
+            }
+            String q=pages.getText().toString().trim().replace('–','-').replace('—','-').replace(" ","");
+            if(q.isEmpty()){pages.setError("أدخل رقم الصفحة أو النطاق");return;}
+            try{
+                int start,end;
+                if(q.matches("\\d+")){
+                    start=Integer.parseInt(q);
+                    end=start;
+                }else if(q.matches("\\d+-\\d+")){
+                    String[] p=q.split("-");
+                    start=Integer.parseInt(p[0]);
+                    end=Integer.parseInt(p[1]);
+                    if(start>end){int t=start;start=end;end=t;}
+                }else{
+                    pages.setError("اكتب مثل 7 أو 1-10");
+                    return;
+                }
+                if(start<1){pages.setError("رقم الصفحة يجب أن يبدأ من 1");return;}
+                selectedPdfStartPage=start;
+                selectedPdfEndPage=end;
+                dlg.dismiss();
+                startConversion();
+            }catch(Exception e){pages.setError("رقم الصفحات غير صحيح");}
+        }));
+        dlg.show();
+    }
+
+    void startConversion(){
         progress.setVisibility(View.VISIBLE);
         progress.setIndeterminate(true);
         status.setVisibility(View.VISIBLE);
-        status.setText("بدء التحويل — لا يوجد حد صفحات مصطنع، ويمكن معالجة أكثر من 500 صفحة...");
+        status.setText(selectedPdfEndPage>0
+            ? "بدء التحويل — الصفحات المحددة: "+selectedPdfStartPage+"-"+selectedPdfEndPage
+            : "بدء التحويل — جميع الصفحات...");
         new Thread(()->{
             try{
                 ArrayList<Uri> jobs=new ArrayList<>(selected);
@@ -558,10 +666,13 @@ public class MainActivity extends AppCompatActivity {
         File f=copyTemp(u,"pdf");
         PdfRenderer r=new PdfRenderer(ParcelFileDescriptor.open(f,ParcelFileDescriptor.MODE_READ_ONLY));
         int count=r.getPageCount();
+        int start=Math.max(1,selectedPdfStartPage);
+        int end=selectedPdfEndPage<1?count:Math.min(count,selectedPdfEndPage);
+        if(start>count){r.close();f.delete();throw new Exception("الصفحة المطلوبة ("+start+") غير موجودة. عدد صفحات الملف: "+count);}
         StringBuilder result=new StringBuilder();
-        for(int i=0;i<count;i++){
+        for(int i=start-1;i<end;i++){
             final int page=i+1;
-            runOnUiThread(()->status.setText("تحليل النص وتخطيط الصفحة "+page+" من "+count));
+            runOnUiThread(()->status.setText("تحليل الصفحة "+page+" من "+end+" — أصل الملف "+count+" صفحة"));
             PdfRenderer.Page p=r.openPage(i);
             double pageW=p.getWidth(), pageH=p.getHeight();
             float scale=Math.min(3.0f,Math.max(1.75f,3000f/Math.max(p.getWidth(),p.getHeight())));
@@ -574,8 +685,8 @@ public class MainActivity extends AppCompatActivity {
             String pageText=ocrBitmapLayout(b);
             b.recycle();
             if(pageText!=null&&!pageText.trim().isEmpty()){
-                result.append("<<PDFPAGE ").append(pageW).append(" ").append(pageH).append(" ").append(w).append(" ").append(h).append(">>\\n");
-                result.append(pageText).append("<<ENDPDFPAGE>>\\n");
+                result.append("<<PDFPAGE ").append(pageW).append(" ").append(pageH).append(" ").append(w).append(" ").append(h).append(">>\n");
+                result.append(pageText).append("<<ENDPDFPAGE>>\n");
             }
         }
         r.close();f.delete();
