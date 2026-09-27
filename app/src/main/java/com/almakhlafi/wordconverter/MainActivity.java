@@ -562,10 +562,10 @@ public class MainActivity extends AppCompatActivity {
             final int page=i+1;
             runOnUiThread(()->status.setText("تحليل تخطيط الصفحة "+page+" من "+count));
             PdfRenderer.Page p=r.openPage(i);
+            double pageW=p.getWidth(), pageH=p.getHeight();
             float scale=Math.min(3.0f,Math.max(1.5f,2600f/Math.max(p.getWidth(),p.getHeight())));
             int w=Math.max(1200,(int)(p.getWidth()*scale));
             int h=Math.max(1200,(int)(p.getHeight()*scale));
-            currentRenderedWidth=w; currentRenderedHeight=h;
             Bitmap b=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
             b.eraseColor(Color.WHITE);
             p.render(b,null,null,PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
@@ -573,12 +573,12 @@ public class MainActivity extends AppCompatActivity {
             String pageText=ocrBitmapLayout(b);
             b.recycle();
             if(pageText!=null&&!pageText.trim().isEmpty()){
-                result.append("<<PDFPAGE ").append(p.getWidth()).append(" ").append(p.getHeight()).append(">>\n");
+                result.append("<<PDFPAGE ").append(pageW).append(" ").append(pageH).append(" ").append(w).append(" ").append(h).append(">>\n");
                 result.append(pageText).append("<<ENDPDFPAGE>>\n");
             }
             System.gc();
         }
-        r.close(); f.delete();
+        r.close();f.delete();
         return result.toString();
     }
 
@@ -909,11 +909,11 @@ public class MainActivity extends AppCompatActivity {
         put(z,"word/_rels/document.xml.rels","<?xml version='1.0'?><Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'/>");
         BufferedReader r=new BufferedReader(new InputStreamReader(new FileInputStream(source),"UTF-8"),65536);
         StringBuilder body=new StringBuilder("<w:document xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'><w:body>");
-        String line; boolean table=false,pdfPage=false; double pageW=595,pageH=842; int prevY=-1,prevH=0;
+        String line; boolean table=false,pdfPage=false; double pageW=595,pageH=842; int renderW=1,renderH=1; int prevY=-1,prevH=0;
         while((line=r.readLine())!=null){
             if(line.startsWith("<<PDFPAGE ")){
                 String[] a=line.substring(10,line.length()-2).trim().split(" ");
-                if(a.length>=2){pageW=Double.parseDouble(a[0]);pageH=Double.parseDouble(a[1]);}
+                if(a.length>=4){pageW=Double.parseDouble(a[0]);pageH=Double.parseDouble(a[1]);renderW=Integer.parseInt(a[2]);renderH=Integer.parseInt(a[3]);}
                 pdfPage=true;prevY=-1;prevH=0;continue;
             }
             if(pdfPage&&line.startsWith("<<L ")&&line.contains(">>")){
@@ -922,7 +922,7 @@ public class MainActivity extends AppCompatActivity {
                     int x=Integer.parseInt(a[0]),y=Integer.parseInt(a[1]),ww=Integer.parseInt(a[2]),hh=Integer.parseInt(a[3]);
                     String tx=normalizeText(cleanOcr(line.substring(k+2)));
                     if(!tx.isEmpty()){
-                        double sx=pageW/Math.max(1,currentRenderedWidth),sy=pageH/Math.max(1,currentRenderedHeight);
+                        double sx=pageW/Math.max(1,renderW),sy=pageH/Math.max(1,renderH);
                         double xPt=x*sx,yPt=y*sy,wPt=ww*sx,hPt=hh*sy;
                         double rightPt=Math.max(0,pageW-(xPt+wPt));
                         double gapPt=prevY<0?Math.max(0,yPt):Math.max(0,yPt-(prevY+prevH)*sy);
