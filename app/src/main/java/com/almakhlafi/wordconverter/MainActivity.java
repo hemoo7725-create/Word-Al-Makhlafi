@@ -670,42 +670,70 @@ public class MainActivity extends AppCompatActivity {
         t.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO);
         t.setVariable("preserve_interword_spaces","1");
         t.setVariable("user_defined_dpi","300");
-        t.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz|¦~\\`^");
+        t.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz|¦~\\u0060^");
         Bitmap prepared=prepareForOcr(b);
         t.setImage(prepared);
         t.getUTF8Text();
-        ArrayList<LayoutLine> lines=new ArrayList<>();
+        ArrayList<LayoutLine> words=new ArrayList<>();
         ResultIterator it=t.getResultIterator();
         if(it!=null){
             it.begin();
             do{
-                if(it.isAtBeginningOf(TessBaseAPI.PageIteratorLevel.RIL_TEXTLINE)){
-                    String tx=it.getUTF8Text(TessBaseAPI.PageIteratorLevel.RIL_TEXTLINE);
-                    Rect rc=it.getBoundingRect(TessBaseAPI.PageIteratorLevel.RIL_TEXTLINE);
-                    float conf=it.confidence(TessBaseAPI.PageIteratorLevel.RIL_TEXTLINE);
-                    tx=normalizeText(cleanOcr(tx==null?"":tx));
-                    if(!tx.isEmpty()&&rc!=null&&rc.width()>3&&rc.height()>3&&conf>=5){
-                        double cy=rc.centerY()/(double)Math.max(1,b.getHeight());
-                        if(isPageNumber(tx)||cy<0.045||cy>0.955)continue;
-                        lines.add(new LayoutLine(tx,rc.left,rc.top,rc.width(),rc.height(),conf));
-                    }
+                String tx=it.getUTF8Text(TessBaseAPI.PageIteratorLevel.RIL_WORD);
+                Rect rc=it.getBoundingRect(TessBaseAPI.PageIteratorLevel.RIL_WORD);
+                float conf=it.confidence(TessBaseAPI.PageIteratorLevel.RIL_WORD);
+                tx=normalizeText(cleanOcr(tx==null?"":tx));
+                if(!tx.isEmpty()&&rc!=null&&rc.width()>2&&rc.height()>2&&conf>=3){
+                    double cy=rc.centerY()/(double)Math.max(1,b.getHeight());
+                    if(!isPageNumber(tx)&&cy>=0.045&&cy<=0.955)
+                        words.add(new LayoutLine(tx,rc.left,rc.top,rc.width(),rc.height(),conf));
                 }
-            }while(it.next(TessBaseAPI.PageIteratorLevel.RIL_TEXTLINE));
+            }while(it.next(TessBaseAPI.PageIteratorLevel.RIL_WORD));
             it.delete();
         }
         t.recycle();
         if(prepared!=b)prepared.recycle();
-        Collections.sort(lines,(x,y)->{
-            int dy=Math.abs(x.y-y.y);
-            if(dy<=Math.max(12,Math.min(x.h,y.h)/2))return Integer.compare(y.x,x.x);
-            return Integer.compare(x.y,y.y);
+        Collections.sort(words,(a,z)->{
+            int dy=Math.abs(a.y-z.y);
+            if(dy<=Math.max(10,Math.min(a.h,z.h)/2))return Integer.compare(z.x,a.x);
+            return Integer.compare(a.y,z.y);
+        });
+        ArrayList<LayoutLine> lines=new ArrayList<>();
+        ArrayList<LayoutLine> current=new ArrayList<>();
+        int baseY=-1,baseH=1;
+        for(LayoutLine w:words){
+            if(current.isEmpty()||Math.abs(w.y-baseY)<=Math.max(10,Math.min(baseH,w.h)/2)){
+                current.add(w);if(baseY<0)baseY=w.y;baseH=Math.max(baseH,w.h);
+            }else{
+                lines.add(mergeWordLine(current));
+                current=new ArrayList<>();current.add(w);baseY=w.y;baseH=w.h;
+            }
+        }
+        if(!current.isEmpty())lines.add(mergeWordLine(current));
+        Collections.sort(lines,(a,z)->{
+            int dy=Math.abs(a.y-z.y);
+            if(dy<=Math.max(12,Math.min(a.h,z.h)/2))return Integer.compare(z.x,a.x);
+            return Integer.compare(a.y,z.y);
         });
         StringBuilder out=new StringBuilder();
         for(LayoutLine l:lines){
             out.append("<<L ").append(l.x).append(" ").append(l.y).append(" ").append(l.w).append(" ").append(l.h).append(">>");
-            out.append(l.text.replace("\n"," ").replace("\r"," ")).append("\n");
+            out.append(fixArabicSpacing(l.text.replace("\n"," ").replace("\r"," "))).append("\n");
         }
         return out.toString();
+    }
+
+    LayoutLine mergeWordLine(ArrayList<LayoutLine> ws){
+        Collections.sort(ws,(a,z)->Integer.compare(z.x,a.x));
+        StringBuilder s=new StringBuilder();
+        int left=Integer.MAX_VALUE,right=0,top=Integer.MAX_VALUE,bottom=0;float conf=0;
+        for(LayoutLine w:ws){
+            if(s.length()>0)s.append(' ');
+            s.append(w.text);
+            left=Math.min(left,w.x);right=Math.max(right,w.x+w.w);
+            top=Math.min(top,w.y);bottom=Math.max(bottom,w.y+w.h);conf+=w.confidence;
+        }
+        return new LayoutLine(fixArabicSpacing(s.toString()),left,top,Math.max(1,right-left),Math.max(1,bottom-top),conf/Math.max(1,ws.size()));
     }
 
     static class LayoutLine{
@@ -1081,6 +1109,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     String fixArabicSpacing(String s){
+        if(s==null||s.isEmpty())return "";
+        String ar="[\\u0621-\\u064A]";
+        s=s.replaceAll("(?<!"+ar+")(من|في|إلى|الى|على|عن|مع|التي|الذي|الذين)(?=ال"+ar+"+)","$1 ");
+        s=s.replaceAll("("+ar+"{2,})(التي|الذي|الذين)(?="+ar+")","$1 $2 ");
+        s=s.replaceAll("("+ar+"{2,})(إلى|الى)(?="+ar+")","$1 $2 ");
+        s=s.replaceAll("\\s{2,}"," ");
+        return s.trim();
+    }
+
         if(s==null||s.isEmpty())return "";
         // Repair OCR tokens that lost word boundaries. Do this only for
         // standalone short function words, never inside ordinary Arabic words.
