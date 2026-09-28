@@ -45,7 +45,6 @@ public class MainActivity extends AppCompatActivity {
         prefs=getSharedPreferences("settings",MODE_PRIVATE);
         applyTheme();
         super.onCreate(b);
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(ui());
     }
 
@@ -1019,11 +1018,14 @@ public class MainActivity extends AppCompatActivity {
         });
         double sx=pageW/Math.max(1,renderW),sy=pageH/Math.max(1,renderH);
         int minX=renderW,maxX=0,minY=renderH,maxY=0;
-        for(LayoutLine l:lines){minX=Math.min(minX,l.x);maxX=Math.max(maxX,l.x+l.w);minY=Math.min(minY,l.y);maxY=Math.max(maxY,l.y+l.h);}
-        double leftMargin=Math.max(18,Math.min(60,minX*sx-6));
-        double rightMargin=Math.max(18,Math.min(60,(renderW-maxX)*sx-6));
-        double topMargin=Math.max(18,Math.min(60,minY*sy-6));
-        double bottomMargin=Math.max(18,Math.min(60,(renderH-maxY)*sy-6));
+        for(LayoutLine l:lines){
+            minX=Math.min(minX,l.x);maxX=Math.max(maxX,l.x+l.w);
+            minY=Math.min(minY,l.y);maxY=Math.max(maxY,l.y+l.h);
+        }
+        double leftMargin=Math.max(18,Math.min(54,minX*sx-4));
+        double rightMargin=Math.max(18,Math.min(54,(renderW-maxX)*sx-4));
+        double topMargin=Math.max(14,Math.min(50,minY*sy-3));
+        double bottomMargin=Math.max(14,Math.min(50,(renderH-maxY)*sy-3));
 
         ArrayList<ArrayList<LayoutLine>> paras=new ArrayList<>();
         ArrayList<LayoutLine> cur=new ArrayList<>();LayoutLine prev=null;
@@ -1031,8 +1033,11 @@ public class MainActivity extends AppCompatActivity {
             if(prev==null)cur.add(l);
             else{
                 double gap=(l.y-(prev.y+prev.h))*sy;
-                double threshold=Math.max(5,Math.min(16,Math.max(prev.h,l.h)*sy*0.60));
-                if(gap>threshold){if(!cur.isEmpty())paras.add(cur);cur=new ArrayList<>();}
+                double threshold=Math.max(7,Math.min(18,Math.max(prev.h,l.h)*sy*0.78));
+                if(gap>threshold){
+                    if(!cur.isEmpty())paras.add(cur);
+                    cur=new ArrayList<>();
+                }
                 cur.add(l);
             }
             prev=l;
@@ -1041,21 +1046,47 @@ public class MainActivity extends AppCompatActivity {
 
         for(ArrayList<LayoutLine> para:paras){
             int maxH=1;for(LayoutLine l:para)maxH=Math.max(maxH,l.h);
-            int font=(int)Math.max(11,Math.min(20,(maxH*sy)*0.70));
-            boolean heading=isPdfHeading(para);if(heading)font=Math.min(21,font+1);
-            body.append("<w:p><w:pPr><w:jc w:val='both'/><w:bidi/><w:spacing w:before='0' w:after='0' w:line='").append(Math.max(240,(int)(maxH*sy*20*0.92))).append("' w:lineRule='exact'/><w:widowControl w:val='0'/></w:pPr>");
-            for(int i=0;i<para.size();i++){
-                String tx=normalizeDates(para.get(i).text);
-                body.append("<w:r><w:rPr><w:rtl/><w:rFonts w:ascii='DecoType Naskh' w:hAnsi='DecoType Naskh' w:eastAsia='DecoType Naskh' w:cs='DecoType Naskh'/><w:sz w:val='").append(font*2).append("'/><w:szCs w:val='").append(font*2).append("'/>");
-                if(heading)body.append("<w:b/><w:bCs/>");
-                body.append("</w:rPr><w:t xml:space='preserve'>").append(xml(tx)).append("</w:t></w:r>");
-                if(i<para.size()-1)body.append("<w:r><w:br/></w:r>");
+            int font=(int)Math.max(10,Math.min(18,(maxH*sy)*0.56));
+            boolean heading=isPdfHeading(para);
+            if(heading)font=Math.min(19,font+1);
+
+            StringBuilder paragraphText=new StringBuilder();
+            for(LayoutLine l:para){
+                String tx=normalizeDates(l.text);
+                if(tx.isEmpty())continue;
+                if(paragraphText.length()>0)paragraphText.append(' ');
+                paragraphText.append(tx);
             }
-            body.append("</w:p>");
+            String tx=fixArabicSpacing(paragraphText.toString().trim());
+            if(tx.isEmpty())continue;
+
+            body.append("<w:p><w:pPr><w:jc w:val='both'/><w:bidi/>")
+                .append("<w:spacing w:before='0' w:after='0' w:line='")
+                .append(Math.max(220,(int)(maxH*sy*20*0.76)))
+                .append("' w:lineRule='auto'/><w:widowControl w:val='0'/></w:pPr>");
+            body.append("<w:r><w:rPr><w:rtl/><w:bidi/><w:rFonts w:ascii='DecoType Naskh' w:hAnsi='DecoType Naskh' w:eastAsia='DecoType Naskh' w:cs='DecoType Naskh'/>")
+                .append("<w:sz w:val='").append(font*2).append("'/><w:szCs w:val='").append(font*2).append("'/>");
+            if(heading)body.append("<w:b/><w:bCs/>");
+            body.append("</w:rPr><w:t xml:space='preserve'>").append(xml(tx)).append("</w:t></w:r></w:p>");
         }
+
         int w=(int)(pageW*20),h=(int)(pageH*20);
-        // section properties belong to the paragraph terminating the section; the final body sectPr is the last section.
-        body.append("<w:p><w:pPr><w:pageBreakBefore/><w:sectPr><w:type w:val='nextPage'/><w:bidi/><w:pgSz w:w='").append(w).append("' w:h='").append(h).append("'/><w:pgMar w:top='").append((int)(topMargin*20)).append("' w:right='").append((int)(rightMargin*20)).append("' w:bottom='").append((int)(bottomMargin*20)).append("' w:left='").append((int)(leftMargin*20)).append("'/></w:sectPr></w:pPr></w:p>");
+        body.append("<w:p><w:pPr><w:pageBreakBefore/><w:sectPr><w:type w:val='nextPage'/><w:bidi/><w:pgSz w:w='")
+            .append(w).append("' w:h='").append(h)
+            .append("'/><w:pgMar w:top='").append((int)(topMargin*20))
+            .append("' w:right='").append((int)(rightMargin*20))
+            .append("' w:bottom='").append((int)(bottomMargin*20))
+            .append("' w:left='").append((int)(leftMargin*20))
+            .append("'/></w:sectPr></w:pPr></w:p>");
+    }
+
+    String fixArabicSpacing(String s){
+        if(s==null||s.isEmpty())return "";
+        // OCR sometimes drops the space after short Arabic prepositions.
+        s=s.replaceAll("([\\u0600-\\u06FF])(من|في|إلى|الى)(?=(ال|[\\u0621-\\u064A]))","$1 $2 ");
+        s=s.replaceAll("(^|[\\s،؛:])و(من|في|إلى|الى)(?=(ال|[\\u0621-\\u064A]))","$1و$2 ");
+        s=s.replaceAll("\\s{2,}"," ");
+        return s.trim();
     }
 
     boolean isPdfHeading(ArrayList<LayoutLine> para){
