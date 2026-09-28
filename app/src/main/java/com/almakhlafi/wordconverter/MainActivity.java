@@ -15,6 +15,9 @@ import android.net.Uri;
 import android.database.Cursor;
 import android.provider.OpenableColumns;
 import android.provider.MediaStore;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import androidx.core.app.NotificationCompat;
 import android.view.*;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
@@ -33,7 +36,8 @@ import javax.xml.parsers.*;
 import org.w3c.dom.*;
 
 public class MainActivity extends AppCompatActivity {
-    static final int PICK=100, CREATE=200, CAMERA=300, TREE=400;
+    static final int PICK=100, CREATE=200, CAMERA=300, TREE=400, NOTIFY=900;
+    static final String CHANNEL_ID="conversion_progress";
     LinearLayout list, root;
     TextView status;
     MaterialCardView selectedCard;
@@ -43,6 +47,7 @@ public class MainActivity extends AppCompatActivity {
     SharedPreferences prefs;
     int selectedPdfStartPage=1;
     int selectedPdfEndPage=-1;
+    String currentOutputName="Word_Al-Makhlafi_Converted.docx";
 
     @Override public void onCreate(Bundle b){
         prefs=getSharedPreferences("settings",MODE_PRIVATE);
@@ -607,6 +612,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     void startConversion(){
+        currentOutputName=buildOutputName();
+        showConversionNotification("جاري تحويل الملف",currentOutputName,false);
         progress.setVisibility(View.VISIBLE);
         progress.setIndeterminate(true);
         status.setVisibility(View.VISIBLE);
@@ -623,7 +630,7 @@ public class MainActivity extends AppCompatActivity {
                     File direct=copyTemp(jobs.get(0),"docx");
                     pendingOutput=direct;
                     out.close(); tempText.delete();
-                    runOnUiThread(()->{progress.setIndeterminate(false);progress.setProgressCompat(100,true);status.setText("تم تجهيز ملف Word مع الحفاظ على تنسيقه الأصلي.");saveResult();});
+                    runOnUiThread(()->{progress.setIndeterminate(false);progress.setProgressCompat(100,true);status.setText("تم تجهيز ملف Word مع الحفاظ على تنسيقه الأصلي.");showConversionNotification("اكتمل التحويل",currentOutputName,true);saveResult();});
                     return;
                 }
                 int total=jobs.size(), index=0;
@@ -652,7 +659,7 @@ public class MainActivity extends AppCompatActivity {
                 pendingOutput=temp;
                 runOnUiThread(()->{progress.setIndeterminate(false);progress.setProgressCompat(100,true);status.setText("اكتمل التحويل. جاري اختيار مكان الحفظ...");saveResult();});
             }catch(Exception e){
-                runOnUiThread(()->{progress.setIndeterminate(false);progress.setVisibility(View.GONE);status.setText("تعذر التحويل: "+e.getMessage());toast("تعذر التحويل: "+e.getMessage());});
+                runOnUiThread(()->{progress.setIndeterminate(false);progress.setVisibility(View.GONE);status.setText("تعذر التحويل: "+e.getMessage());showConversionNotification("تعذر التحويل",e.getMessage()==null?"حدث خطأ أثناء التحويل":e.getMessage(),true);toast("تعذر التحويل: "+e.getMessage());});
             }
         }).start();
     }
@@ -662,8 +669,48 @@ public class MainActivity extends AppCompatActivity {
         if(!tree.isEmpty()){try{DocumentFile dir=DocumentFile.fromTreeUri(this,Uri.parse(tree));if(dir!=null&&dir.canWrite()){DocumentFile out=dir.createFile("application/vnd.openxmlformats-officedocument.wordprocessingml.document","Word_Al-Makhlafi_"+System.currentTimeMillis()+".docx");if(out!=null){OutputStream o=getContentResolver().openOutputStream(out.getUri());copyStream(new FileInputStream(pendingOutput),o);pendingOutput.delete();pendingOutput=null;progress.setVisibility(View.GONE);status.setText("تم حفظ الملف في المكان المحدد.");toast("تم الحفظ بنجاح.");return;}}}catch(Exception ignored){}}
         askSaveLocation();
     }
-    void askSaveLocation(){Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");i.putExtra(Intent.EXTRA_TITLE,"Word_Al-Makhlafi_Converted.docx");startActivityForResult(i,CREATE);}
+    void askSaveLocation(){Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");i.putExtra(Intent.EXTRA_TITLE,currentOutputName);startActivityForResult(i,CREATE);}
     void savePendingTo(Uri out){if(pendingOutput==null)return;try{OutputStream o=getContentResolver().openOutputStream(out);copyStream(new FileInputStream(pendingOutput),o);pendingOutput.delete();pendingOutput=null;progress.setVisibility(View.GONE);status.setText("تم حفظ الملف بنجاح.");toast("تم الحفظ بنجاح.");}catch(Exception e){toast("تعذر الحفظ: "+e.getMessage());}}
+    String buildOutputName(){
+        if(selected.size()==1){
+            String n=name(selected.get(0));
+            int dot=n.lastIndexOf('.');
+            if(dot>0)n=n.substring(0,dot);
+            return n+".docx";
+        }
+        return "Word_Al-Makhlafi_Converted.docx";
+    }
+
+    void showConversionNotification(String title,String text,boolean finished){
+        try{
+            NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
+            if(Build.VERSION.SDK_INT>=26){
+                NotificationChannel ch=new NotificationChannel(CHANNEL_ID,"حالة تحويل الملفات",NotificationManager.IMPORTANCE_HIGH);
+                ch.setDescription("إشعارات تحويل الملفات إلى Word");
+                ch.setShowBadge(true);
+                nm.createNotificationChannel(ch);
+            }
+            if(Build.VERSION.SDK_INT>=33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=android.content.pm.PackageManager.PERMISSION_GRANTED){
+                requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},901);
+            }
+            Intent open=new Intent(this,MainActivity.class);
+            open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP|Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            PendingIntent pi=PendingIntent.getActivity(this,0,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+            NotificationCompat.Builder b=new NotificationCompat.Builder(this,CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_launcher)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setSubText(currentOutputName)
+                .setContentIntent(pi)
+                .setOnlyAlertOnce(true)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(finished)
+                .setOngoing(!finished);
+            if(!finished)b.setProgress(0,0,true);
+            nm.notify(NOTIFY,b.build());
+        }catch(Exception ignored){}
+    }
+
 
     String extract(Uri u)throws Exception{
         String n=name(u).toLowerCase(Locale.ROOT);
