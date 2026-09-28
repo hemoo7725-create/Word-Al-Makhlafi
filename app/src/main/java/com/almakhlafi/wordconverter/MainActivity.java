@@ -1109,6 +1109,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     String fixArabicSpacing(String s){
+        if(s==null||s.isEmpty())return "";
+        String ar="[\\u0621-\\u064A]";
+        s=s.replaceAll("(?<!"+ar+")(من|في|إلى|الى|على|عن|مع|التي|الذي|الذين)(?=ال"+ar+"+)","$1 ");
+        s=s.replaceAll("("+ar+"{2,})(التي|الذي|الذين)(?="+ar+")","$1 $2 ");
+        s=s.replaceAll("("+ar+"{2,})(إلى|الى)(?="+ar+")","$1 $2 ");
+        s=s.replaceAll("\\s{2,}"," ");
+        return s.trim();
+    }
 
     boolean isPdfHeading(ArrayList<LayoutLine> para){
         if(para==null||para.isEmpty())return false;
