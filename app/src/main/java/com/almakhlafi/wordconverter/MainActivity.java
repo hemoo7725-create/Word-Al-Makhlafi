@@ -37,6 +37,9 @@ public class MainActivity extends AppCompatActivity {
     ArrayList<Uri> selected=new ArrayList<>();
     File pendingOutput;
     SharedPreferences prefs;
+    int selectedPdfStartPage=1;
+    int selectedPdfEndPage=-1;
+    boolean pageSelectionReady=false;
 
     @Override public void onCreate(Bundle b){
         prefs=getSharedPreferences("settings",MODE_PRIVATE);
@@ -497,10 +500,14 @@ public class MainActivity extends AppCompatActivity {
 
     void createOutput(){
         if(selected.isEmpty()){toast("أضف ملفًا أولًا");return;}
+        boolean hasPdf=false;
+        for(Uri u:selected) if(name(u).toLowerCase(Locale.ROOT).endsWith(".pdf")){hasPdf=true;break;}
+        if(hasPdf && !pageSelectionReady){showPdfPageSelection();return;}
+        pageSelectionReady=false;
         progress.setVisibility(View.VISIBLE);
         progress.setIndeterminate(true);
         status.setVisibility(View.VISIBLE);
-        status.setText("بدء التحويل — لا يوجد حد صفحات مصطنع، ويمكن معالجة أكثر من 500 صفحة...");
+        status.setText("بدء التحويل...");
         new Thread(()->{
             try{
                 ArrayList<Uri> jobs=new ArrayList<>(selected);
@@ -520,9 +527,7 @@ public class MainActivity extends AppCompatActivity {
                     final int idx=index;
                     runOnUiThread(()->status.setText("معالجة الملف "+idx+" من "+total+" : "+name(u)));
                     streamExtract(u,out);
-                    out.write("\n");
-                    out.write("==================================================\n");
-                    out.flush();
+                    if(index<total){out.write("\n");out.flush();}
                 }
                 out.close();
                 File temp=new File(getCacheDir(),"Word_AlMakhlafi_"+System.currentTimeMillis()+".docx");
@@ -534,6 +539,33 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(()->{progress.setIndeterminate(false);progress.setVisibility(View.GONE);status.setText("تعذر التحويل: "+e.getMessage());toast("تعذر التحويل: "+e.getMessage());});
             }
         }).start();
+    }
+
+    void showPdfPageSelection(){
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20),dp(8),dp(20),dp(4));
+        TextView h=sectionTitle("اختيار صفحات PDF"); box.addView(h);
+        TextView info=new TextView(this);
+        info.setText("اكتب رقم صفحة واحدة مثل 7، أو نطاقًا مثل 5-12، أو اختر كل الصفحات.");
+        info.setTextSize(15);info.setTextColor(text());info.setGravity(Gravity.RIGHT);info.setPadding(4,4,4,12);box.addView(info);
+        EditText range=new EditText(this);
+        range.setHint("مثال: 5-12");range.setTextSize(18);range.setSingleLine(true);range.setGravity(Gravity.RIGHT);
+        box.addView(range,new LinearLayout.LayoutParams(-1,dp(58)));
+        CheckBox all=new CheckBox(this);
+        all.setText("تحويل جميع صفحات PDF");all.setTextSize(16);all.setGravity(Gravity.RIGHT);all.setChecked(true);box.addView(all);
+        all.setOnCheckedChangeListener((b,checked)->{range.setEnabled(!checked);if(checked)range.setText("");});
+        new AlertDialog.Builder(this).setView(box)
+            .setPositiveButton("بدء التحويل",(d,w)->{
+                if(all.isChecked()){selectedPdfStartPage=1;selectedPdfEndPage=-1;pageSelectionReady=true;createOutput();return;}
+                String s=range.getText().toString().trim().replace('–','-').replace('—','-').replace('−','-');
+                try{
+                    if(s.matches("\\d+")){int p=Integer.parseInt(s);if(p<1)throw new Exception();selectedPdfStartPage=p;selectedPdfEndPage=p;}
+                    else if(s.matches("\\d+\\s*-\\s*\\d+")){String[] a=s.split("-");int from=Integer.parseInt(a[0].trim()),to=Integer.parseInt(a[1].trim());if(from<1||to<from)throw new Exception();selectedPdfStartPage=from;selectedPdfEndPage=to;}
+                    else throw new Exception();
+                    pageSelectionReady=true;createOutput();
+                }catch(Exception ex){toast("أدخل رقم صفحة أو نطاقًا صحيحًا مثل 5-12.");}
+            }).setNegativeButton("إلغاء",null).show();
     }
 
     void saveResult(){
@@ -558,30 +590,34 @@ public class MainActivity extends AppCompatActivity {
         File f=copyTemp(u,"pdf");
         PdfRenderer r=new PdfRenderer(ParcelFileDescriptor.open(f,ParcelFileDescriptor.MODE_READ_ONLY));
         int count=r.getPageCount();
+        int from=Math.max(1,Math.min(selectedPdfStartPage,count));
+        int to=selectedPdfEndPage<1?count:Math.min(selectedPdfEndPage,count);
+        if(from>to){r.close();f.delete();throw new Exception("نطاق الصفحات خارج عدد صفحات ملف PDF.");}
         StringBuilder result=new StringBuilder();
-        for(int i=0;i<count;i++){
+        for(int i=from-1;i<to;i++){
             final int page=i+1;
-            runOnUiThread(()->status.setText("تحليل تخطيط الصفحة "+page+" من "+count));
+            runOnUiThread(()->status.setText("استخراج الصفحة "+page+" من "+to));
             PdfRenderer.Page p=r.openPage(i);
             double pageW=p.getWidth(), pageH=p.getHeight();
-            float scale=Math.min(3.0f,Math.max(1.5f,2600f/Math.max(p.getWidth(),p.getHeight())));
+            float scale=Math.min(2.8f,Math.max(1.45f,2200f/Math.max(p.getWidth(),p.getHeight())));
             int w=Math.max(1200,(int)(p.getWidth()*scale));
             int h=Math.max(1200,(int)(p.getHeight()*scale));
             Bitmap b=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
             b.eraseColor(Color.WHITE);
             p.render(b,null,null,PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
             p.close();
-            String pageText=ocrBitmapLayout(b);
+            String pageText=ocrBitmapLayout(b,pageW,pageH);
             b.recycle();
             if(pageText!=null&&!pageText.trim().isEmpty()){
                 result.append("<<PDFPAGE ").append(pageW).append(" ").append(pageH).append(" ").append(w).append(" ").append(h).append(">>\n");
                 result.append(pageText).append("<<ENDPDFPAGE>>\n");
             }
-            System.gc();
         }
         r.close();f.delete();
         return result.toString();
     }
+
+    String cleanPages(ArrayList<String> pages){
 
     String cleanPages(ArrayList<String> pages){
         ArrayList<String> cleaned=new ArrayList<>();
@@ -621,7 +657,7 @@ public class MainActivity extends AppCompatActivity {
         return normalizeText(cleanOcr(x==null?"":x));
     }
 
-    String ocrBitmapLayout(Bitmap b)throws Exception{
+    String ocrBitmapLayout(Bitmap b,double pageW,double pageH)throws Exception{
         if(b==null)throw new Exception("تعذر قراءة الصفحة");
         File td=new File(getFilesDir(),"tessdata");if(!td.exists())td.mkdirs();
         asset("tessdata/ara.traineddata",new File(td,"ara.traineddata"));
@@ -629,12 +665,13 @@ public class MainActivity extends AppCompatActivity {
         if(!t.init(getFilesDir().getAbsolutePath(),"ara"))throw new Exception("فشل تشغيل OCR العربي");
         t.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO);
         t.setVariable("preserve_interword_spaces","1");
-        t.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz|¦~\\u0060^\\\\");
+        t.setVariable("user_defined_dpi","300");
+        t.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz|¦~\\`^");
         Bitmap prepared=prepareForOcr(b);
         t.setImage(prepared);
         t.getUTF8Text();
-        ResultIterator it=t.getResultIterator();
         ArrayList<LayoutLine> lines=new ArrayList<>();
+        ResultIterator it=t.getResultIterator();
         if(it!=null){
             it.begin();
             do{
@@ -643,7 +680,9 @@ public class MainActivity extends AppCompatActivity {
                     Rect rc=it.getBoundingRect(TessBaseAPI.PageIteratorLevel.RIL_TEXTLINE);
                     float conf=it.confidence(TessBaseAPI.PageIteratorLevel.RIL_TEXTLINE);
                     tx=normalizeText(cleanOcr(tx==null?"":tx));
-                    if(!tx.isEmpty()&&rc!=null&&rc.width()>3&&rc.height()>3&&conf>=18){
+                    if(!tx.isEmpty()&&rc!=null&&rc.width()>3&&rc.height()>3&&conf>=5){
+                        double cy=rc.centerY()/(double)Math.max(1,b.getHeight());
+                        if(isPageNumber(tx)||cy<0.045||cy>0.955)continue;
                         lines.add(new LayoutLine(tx,rc.left,rc.top,rc.width(),rc.height(),conf));
                     }
                 }
@@ -652,10 +691,10 @@ public class MainActivity extends AppCompatActivity {
         }
         t.recycle();
         if(prepared!=b)prepared.recycle();
-        Collections.sort(lines,(a,c)->{
-            int dy=Math.abs(a.y-c.y);
-            if(dy<=Math.max(10,Math.min(a.h,c.h)/2))return Integer.compare(c.x,a.x);
-            return Integer.compare(a.y,c.y);
+        Collections.sort(lines,(x,y)->{
+            int dy=Math.abs(x.y-y.y);
+            if(dy<=Math.max(12,Math.min(x.h,y.h)/2))return Integer.compare(y.x,x.x);
+            return Integer.compare(x.y,y.y);
         });
         StringBuilder out=new StringBuilder();
         for(LayoutLine l:lines){
@@ -674,17 +713,14 @@ public class MainActivity extends AppCompatActivity {
     int currentRenderedHeight=1;
 
     Bitmap prepareForOcr(Bitmap src){
-        int w=src.getWidth(), h=src.getHeight();
-        Bitmap out=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
-        for(int y=0;y<h;y++){
-            for(int x=0;x<w;x++){
-                int p=src.getPixel(x,y);
-                int r=Color.red(p),g=Color.green(p),bl=Color.blue(p);
-                int gray=(r*299+g*587+bl*114)/1000;
-                int v=gray<185?35:255;
-                out.setPixel(x,y,Color.rgb(v,v,v));
-            }
-        }
+        if(src==null)return null;
+        Bitmap out=Bitmap.createBitmap(src.getWidth(),src.getHeight(),Bitmap.Config.ARGB_8888);
+        Canvas canvas=new Canvas(out);
+        Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
+        ColorMatrix m=new ColorMatrix();m.setSaturation(0f);
+        paint.setColorFilter(new ColorMatrixColorFilter(m));
+        canvas.drawColor(Color.WHITE);
+        canvas.drawBitmap(src,0,0,paint);
         return out;
     }
 
@@ -709,20 +745,41 @@ public class MainActivity extends AppCompatActivity {
     String normalizeText(String x){
         if(x==null)return "";
         String s=x.replace("\u0640","");
-        // لا نُسقط الهمزات: الحفاظ على أ/إ/آ/ؤ/ئ/ء جزء أساسي من النسخة الجديدة.
         s=s.replaceAll("(?m)[ \\t]+"," ");
         s=s.replaceAll(" *\\n *","\\n");
         s=s.replaceAll(" +([،؛:؟,.!])","$1");
         s=s.replaceAll("([،؛:؟,.!])\\1+","$1");
-        // تصحيحات محافظة؛ لا تُطبّق على كلمات أطول.
+        s=normalizeDates(s);
         String[] bad={"هاذا","هاذه","هاؤلاء","اللذي","الذيي","التيي","لاكن","ولكنن","مسوول","مسئول","شيى","شئ","جزءا"};
         String[] good={"هذا","هذه","هؤلاء","الذي","الذي","التي","لكن","ولكن","مسؤول","مسؤول","شيء","شيء","جزءاً"};
         for(int i=0;i<bad.length;i++)s=s.replaceAll("(?<![\\u0600-\\u06FF])"+bad[i]+"(?![\\u0600-\\u06FF])",good[i]);
-        if(prefs.getBoolean("clean",true)){
-            s=s.replaceAll("[|¦]{1,}"," ");
-            s=s.replaceAll("[ ]{2,}"," ");
-        }
+        if(prefs.getBoolean("clean",true)){s=s.replaceAll("[|¦~\\`^]+"," ");s=s.replaceAll("[ ]{2,}"," ");}
         return s.trim();
+    }
+
+    String normalizeDates(String s){
+        if(s==null||s.isEmpty())return "";
+        java.util.regex.Matcher m=java.util.regex.Pattern.compile("([0-9٠-٩]{1,4})\\s*[-./]\\s*([0-9٠-٩]{1,2})\\s*[-./]\\s*([0-9٠-٩]{1,4})").matcher(s);
+        StringBuffer out=new StringBuffer();
+        while(m.find()){
+            String a=digitsToAscii(m.group(1)),b=digitsToAscii(m.group(2)),d=digitsToAscii(m.group(3)),rep=m.group();
+            if(a.length()==4&&d.length()<=2)rep=d+"/"+b+"/"+a;
+            else if(d.length()==4)rep=a+"/"+b+"/"+d;
+            m.appendReplacement(out,java.util.regex.Matcher.quoteReplacement(rep));
+        }
+        m.appendTail(out);
+        return out.toString();
+    }
+
+    String digitsToAscii(String s){
+        if(s==null)return "";
+        StringBuilder b=new StringBuilder();
+        for(char c:s.toCharArray()){
+            if(c>='٠'&&c<='٩')b.append((char)('0'+c-'٠'));
+            else if(c>='۰'&&c<='۹')b.append((char)('0'+c-'۰'));
+            else b.append(c);
+        }
+        return b.toString();
     }
 
     void asset(String a,File d)throws Exception{if(d.exists()&&d.length()>1000)return;InputStream in=getAssets().open(a);FileOutputStream o=new FileOutputStream(d);byte[] b=new byte[8192];int n;while((n=in.read(b))>0)o.write(b,0,n);in.close();o.close();}
@@ -910,52 +967,103 @@ public class MainActivity extends AppCompatActivity {
         put(z,"word/_rels/document.xml.rels","<?xml version='1.0'?><Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'/>");
         BufferedReader r=new BufferedReader(new InputStreamReader(new FileInputStream(source),"UTF-8"),65536);
         StringBuilder body=new StringBuilder("<w:document xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'><w:body>");
-        String line; boolean table=false,pdfPage=false; double pageW=595,pageH=842; int renderW=1,renderH=1; int prevY=-1,prevH=0;
+        String line;boolean table=false,pdfPage=false;double pageW=595,pageH=842;int renderW=1,renderH=1;
+        ArrayList<LayoutLine> pageLines=new ArrayList<>();
         while((line=r.readLine())!=null){
             if(line.startsWith("<<PDFPAGE ")){
+                pageLines.clear();
                 String[] a=line.substring(10,line.length()-2).trim().split(" ");
                 if(a.length>=4){pageW=Double.parseDouble(a[0]);pageH=Double.parseDouble(a[1]);renderW=Integer.parseInt(a[2]);renderH=Integer.parseInt(a[3]);}
-                pdfPage=true;prevY=-1;prevH=0;continue;
+                pdfPage=true;continue;
             }
             if(pdfPage&&line.startsWith("<<L ")&&line.contains(">>")){
                 int k=line.indexOf(">>");String[] a=line.substring(4,k).trim().split(" ");
-                if(a.length>=4){
+                if(a.length>=4)try{
                     int x=Integer.parseInt(a[0]),y=Integer.parseInt(a[1]),ww=Integer.parseInt(a[2]),hh=Integer.parseInt(a[3]);
                     String tx=normalizeText(cleanOcr(line.substring(k+2)));
-                    if(!tx.isEmpty()){
-                        double sx=pageW/Math.max(1,renderW),sy=pageH/Math.max(1,renderH);
-                        double xPt=x*sx,yPt=y*sy,wPt=ww*sx,hPt=hh*sy;
-                        double rightPt=Math.max(0,pageW-(xPt+wPt));
-                        double gapPt=prevY<0?Math.max(0,yPt):Math.max(0,yPt-(prevY+prevH)*sy);
-                        int before=(int)Math.min(1800,Math.max(0,gapPt*20));
-                        int font=(int)Math.max(9,Math.min(22,hPt*.82));
-                        String jc=(xPt+wPt/2>pageW*.40&&xPt+wPt/2<pageW*.60)?"center":"right";
-                        body.append("<w:p><w:pPr><w:jc w:val='").append(jc).append("'/><w:bidi/>");
-                        if("right".equals(jc))body.append("<w:ind w:right='").append((int)(rightPt*20)).append("'/>");
-                        body.append("<w:spacing w:before='").append(before).append("' w:after='0' w:line='").append(Math.max(240,(int)(hPt*20))).append("' w:lineRule='exact'/></w:pPr>");
-                        body.append("<w:r><w:rPr><w:rtl/><w:sz w:val='").append(font*2).append("'/><w:szCs w:val='").append(font*2).append("'/></w:rPr><w:t xml:space='preserve'>").append(xml(tx)).append("</w:t></w:r></w:p>");
-                        prevY=y;prevH=hh;
-                    }
-                }
+                    if(!tx.isEmpty())pageLines.add(new LayoutLine(tx,x,y,ww,hh,100));
+                }catch(Exception ignored){}
                 continue;
             }
             if(pdfPage&&line.startsWith("<<ENDPDFPAGE>>")){
-                body.append("<w:p><w:pPr><w:sectPr><w:type w:val='nextPage'/><w:pgSz w:w='").append((int)(pageW*20)).append("' w:h='").append((int)(pageH*20)).append("'/><w:pgMar w:top='360' w:right='360' w:bottom='360' w:left='360'/></w:sectPr></w:pPr></w:p>");
-                pdfPage=false;prevY=-1;prevH=0;continue;
+                writePdfPage(body,pageLines,pageW,pageH,renderW,renderH);pdfPage=false;continue;
             }
             if(pdfPage)continue;
             if(line.equals("<<TABLE>>")){table=true;body.append("<w:tbl><w:tblPr><w:tblBorders><w:top w:val='single'/><w:left w:val='single'/><w:bottom w:val='single'/><w:right w:val='single'/><w:insideH w:val='single'/><w:insideV w:val='single'/></w:tblBorders></w:tblPr>");continue;}
             if(line.equals("<</TABLE>>")){table=false;body.append("</w:tbl>");continue;}
             if(table){
-                body.append("<w:tr>");for(String cell:line.split("\\t",-1))body.append("<w:tc><w:p><w:pPr><w:jc w:val='right'/><w:bidi/></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t xml:space='preserve'>").append(xml(cell)).append("</w:t></w:r></w:p></w:tc>");body.append("</w:tr>");
+                body.append("<w:tr>");
+                for(String cell:line.split("\\t",-1))
+                    body.append("<w:tc><w:p><w:pPr><w:jc w:val='both'/><w:bidi/><w:spacing w:before='0' w:after='0' w:line='240' w:lineRule='auto'/></w:pPr><w:r><w:rPr><w:rtl/><w:rFonts w:ascii='DecoType Naskh' w:hAnsi='DecoType Naskh' w:eastAsia='DecoType Naskh' w:cs='DecoType Naskh'/></w:rPr><w:t xml:space='preserve'>").append(xml(normalizeDates(cell))).append("</w:t></w:r></w:p></w:tc>");
+                body.append("</w:tr>");
             }else if(!line.trim().isEmpty()){
-                body.append("<w:p><w:pPr><w:jc w:val='right'/><w:bidi/></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t xml:space='preserve'>").append(xml(line)).append("</w:t></w:r></w:p>");
+                body.append("<w:p><w:pPr><w:jc w:val='both'/><w:bidi/><w:spacing w:before='0' w:after='0' w:line='276' w:lineRule='auto'/></w:pPr><w:r><w:rPr><w:rtl/><w:rFonts w:ascii='DecoType Naskh' w:hAnsi='DecoType Naskh' w:eastAsia='DecoType Naskh' w:cs='DecoType Naskh'/></w:rPr><w:t xml:space='preserve'>").append(xml(normalizeDates(line))).append("</w:t></w:r></w:p>");
             }
         }
         r.close();
         body.append("<w:sectPr><w:pgSz w:w='11906' w:h='16838'/><w:pgMar w:top='720' w:right='720' w:bottom='720' w:left='720'/></w:sectPr></w:body></w:document>");
         put(z,"word/document.xml",body.toString());z.close();
     }
+
+    void writePdfPage(StringBuilder body,ArrayList<LayoutLine> lines,double pageW,double pageH,int renderW,int renderH){
+        if(lines==null||lines.isEmpty())return;
+        Collections.sort(lines,(a,b)->{
+            int dy=Math.abs(a.y-b.y);
+            if(dy<=Math.max(12,Math.min(a.h,b.h)/2))return Integer.compare(b.x,a.x);
+            return Integer.compare(a.y,b.y);
+        });
+        double sx=pageW/Math.max(1,renderW),sy=pageH/Math.max(1,renderH);
+        int minX=renderW,maxX=0,minY=renderH,maxY=0;
+        for(LayoutLine l:lines){minX=Math.min(minX,l.x);maxX=Math.max(maxX,l.x+l.w);minY=Math.min(minY,l.y);maxY=Math.max(maxY,l.y+l.h);}
+        double leftMargin=Math.max(18,Math.min(60,minX*sx-6));
+        double rightMargin=Math.max(18,Math.min(60,(renderW-maxX)*sx-6));
+        double topMargin=Math.max(18,Math.min(60,minY*sy-6));
+        double bottomMargin=Math.max(18,Math.min(60,(renderH-maxY)*sy-6));
+
+        ArrayList<ArrayList<LayoutLine>> paras=new ArrayList<>();
+        ArrayList<LayoutLine> cur=new ArrayList<>();LayoutLine prev=null;
+        for(LayoutLine l:lines){
+            if(prev==null)cur.add(l);
+            else{
+                double gap=(l.y-(prev.y+prev.h))*sy;
+                double threshold=Math.max(5,Math.min(16,Math.max(prev.h,l.h)*sy*0.60));
+                if(gap>threshold){if(!cur.isEmpty())paras.add(cur);cur=new ArrayList<>();}
+                cur.add(l);
+            }
+            prev=l;
+        }
+        if(!cur.isEmpty())paras.add(cur);
+
+        for(ArrayList<LayoutLine> para:paras){
+            int maxH=1;for(LayoutLine l:para)maxH=Math.max(maxH,l.h);
+            int font=(int)Math.max(11,Math.min(20,(maxH*sy)*0.70));
+            boolean heading=isPdfHeading(para);if(heading)font=Math.min(21,font+1);
+            body.append("<w:p><w:pPr><w:jc w:val='both'/><w:bidi/><w:spacing w:before='0' w:after='0' w:line='").append(Math.max(240,(int)(maxH*sy*20*0.92))).append("' w:lineRule='exact'/><w:widowControl w:val='0'/></w:pPr>");
+            for(int i=0;i<para.size();i++){
+                String tx=normalizeDates(para.get(i).text);
+                body.append("<w:r><w:rPr><w:rtl/><w:rFonts w:ascii='DecoType Naskh' w:hAnsi='DecoType Naskh' w:eastAsia='DecoType Naskh' w:cs='DecoType Naskh'/><w:sz w:val='").append(font*2).append("'/><w:szCs w:val='").append(font*2).append("'/>");
+                if(heading)body.append("<w:b/><w:bCs/>");
+                body.append("</w:rPr><w:t xml:space='preserve'>").append(xml(tx)).append("</w:t></w:r>");
+                if(i<para.size()-1)body.append("<w:r><w:br/></w:r>");
+            }
+            body.append("</w:p>");
+        }
+        int w=(int)(pageW*20),h=(int)(pageH*20);
+        // section properties belong to the paragraph terminating the section; the final body sectPr is the last section.
+        body.append("<w:p><w:pPr><w:pageBreakBefore/><w:sectPr><w:type w:val='nextPage'/><w:bidi/><w:pgSz w:w='").append(w).append("' w:h='").append(h).append("'/><w:pgMar w:top='").append((int)(topMargin*20)).append("' w:right='").append((int)(rightMargin*20)).append("' w:bottom='").append((int)(bottomMargin*20)).append("' w:left='").append((int)(leftMargin*20)).append("'/></w:sectPr></w:pPr></w:p>");
+    }
+
+    boolean isPdfHeading(ArrayList<LayoutLine> para){
+        if(para==null||para.isEmpty())return false;
+        String s=para.get(0).text.trim();
+        if(s.length()>120)return false;
+        if(s.matches("^(أولاً|ثانياً|ثالثاً|رابعاً|أولاً:|ثانياً:|ثالثاً:|رابعاً:).*"))return true;
+        if(s.matches("^[٠-٩0-9]+[.)].*"))return true;
+        if(s.endsWith(":")||s.endsWith("؛"))return true;
+        return para.size()==1&&s.length()<80;
+    }
+
+
 
     void put(ZipOutputStream z,String n,String s)throws Exception{z.putNextEntry(new ZipEntry(n));z.write(s.getBytes("UTF-8"));z.closeEntry();}
     String xml(String s){return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;").replace("'","&apos;");}
