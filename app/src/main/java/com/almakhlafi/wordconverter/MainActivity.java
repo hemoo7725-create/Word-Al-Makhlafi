@@ -117,14 +117,17 @@ public class MainActivity extends AppCompatActivity {
         page.addView(salawatCard,new LinearLayout.LayoutParams(-1,dp(124)));
 
         MaterialCardView banner=card();
-        banner.setCardBackgroundColor(Color.rgb(35,143,226));
+        banner.setBackground(gradient(Color.rgb(74,181,245),Color.rgb(20,105,190),18));
         banner.setStrokeWidth(0);
+        banner.setCardElevation(dp(4));
         TextView bannerText=new TextView(this);
         bannerText.setText("تحويل واستخراج جميع\nأنواع الملفات إلى وورد");
         bannerText.setTextColor(Color.WHITE);
         bannerText.setTextSize(23);
+        bannerText.setTypeface(null,Typeface.BOLD);
         bannerText.setGravity(Gravity.CENTER);
         bannerText.setLineSpacing(0,0.95f);
+        bannerText.setShadowLayer(dp(2),dp(1),dp(2),Color.argb(110,0,0,0));
         banner.addView(bannerText,new LinearLayout.LayoutParams(-1,dp(104)));
         LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,dp(108));
         bp.setMargins(0,dp(12),0,dp(12));
@@ -963,7 +966,8 @@ public class MainActivity extends AppCompatActivity {
                 double gap=Math.max(0,(first.y-(pl.y+pl.h))*sy);
                 before=(int)Math.min(360,Math.max(0,gap*12));
             }
-            body.append("<w:p><w:pPr><w:jc w:val='right'/><w:bidi/>");
+            // Word: ضبط كامل + اتجاه RTL، مع المحافظة على موضع الفقرة الأصلي.
+            body.append("<w:p><w:pPr><w:jc w:val='both'/><w:bidi/>");
             body.append("<w:ind w:right='").append((int)(rightPt*20)).append("'/>");
             body.append("<w:spacing w:before='").append(before).append("' w:after='0' w:line='").append(Math.max(240,(int)((first.h*sy)*20))).append("' w:lineRule='auto'/></w:pPr>");
             for(int i=0;i<para.size();i++){
@@ -971,7 +975,10 @@ public class MainActivity extends AppCompatActivity {
                 String tx=normalizeDates(normalizeText(cleanOcr(l.text)));
                 if(tx.isEmpty())continue;
                 int fs=(int)Math.max(10,Math.min(22,(l.h*sy)*0.82));
-                body.append("<w:r><w:rPr><w:rtl/><w:sz w:val='").append(fs*2).append("'/><w:szCs w:val='").append(fs*2).append("'/></w:rPr>");
+                boolean heading=isPdfHeading(tx, i==0, para.size(), fs);
+                body.append("<w:r><w:rPr><w:rtl/><w:bidi/><w:rFonts w:ascii='DecoType Naskh' w:hAnsi='DecoType Naskh' w:eastAsia='DecoType Naskh' w:cs='DecoType Naskh'/><w:sz w:val='").append(fs*2).append("'/><w:szCs w:val='").append(fs*2).append("'/>");
+                if(heading)body.append("<w:b/><w:bCs/>");
+                body.append("</w:rPr>");
                 body.append("<w:t xml:space='preserve'>").append(xml(tx)).append("</w:t></w:r>");
                 if(i<para.size()-1)body.append("<w:r><w:br/></w:r>");
             }
@@ -980,6 +987,17 @@ public class MainActivity extends AppCompatActivity {
         body.append("<w:p><w:pPr><w:sectPr><w:type w:val='nextPage'/><w:pgSz w:w='").append((int)(pageW*20)).append("' w:h='").append((int)(pageH*20)).append("'/><w:pgMar w:top='360' w:right='360' w:bottom='360' w:left='360'/></w:sectPr></w:pPr></w:p>");
     }
 
+
+    boolean isPdfHeading(String s,boolean first,int paragraphSize,int fs){
+        if(s==null)return false;
+        String q=s.trim();
+        if(q.isEmpty())return false;
+        if(q.matches("^(الباب|الفصل|المبحث|المطلب|الفرع|القسم|أولاً|ثانياً|ثالثاً|رابعاً|خامساً|سادساً|سابعاً|ثامناً|تاسعاً|عاشراً)(\\s|:|$).*")) return true;
+        if(q.matches("^[0-9٠-٩]+[\\)\\].:؛-]\\s*.*") || q.matches("^[أ-ي][\\)\\].:؛-]\\s*.*")) return true;
+        if(q.endsWith(":") || q.endsWith("؛") || q.endsWith("؟")) return q.length()<=90;
+        if(first && paragraphSize<=2 && q.length()<=70 && !q.matches(".*[،,؛;]\\s*$")) return true;
+        return false;
+    }
 
     void asset(String a,File d)throws Exception{if(d.exists()&&d.length()>1000)return;InputStream in=getAssets().open(a);FileOutputStream o=new FileOutputStream(d);byte[] b=new byte[8192];int n;while((n=in.read(b))>0)o.write(b,0,n);in.close();o.close();}
     String extractZipXml(Uri u)throws Exception{
@@ -1200,11 +1218,11 @@ public class MainActivity extends AppCompatActivity {
             if(table){
                 body.append("<w:tr>");
                 for(String cell:line.split("\\t",-1)){
-                    body.append("<w:tc><w:p><w:pPr><w:jc w:val='right'/><w:bidi/></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t xml:space='preserve'>").append(xml(normalizeDates(normalizeText(cell)))).append("</w:t></w:r></w:p></w:tc>");
+                    body.append("<w:tc><w:p><w:pPr><w:jc w:val='both'/><w:bidi/></w:pPr><w:r><w:rPr><w:rtl/><w:rFonts w:ascii='DecoType Naskh' w:hAnsi='DecoType Naskh' w:eastAsia='DecoType Naskh' w:cs='DecoType Naskh'/></w:rPr><w:t xml:space='preserve'>").append(xml(normalizeDates(normalizeText(cell)))).append("</w:t></w:r></w:p></w:tc>");
                 }
                 body.append("</w:tr>");
             }else if(!line.trim().isEmpty()){
-                body.append("<w:p><w:pPr><w:jc w:val='right'/><w:bidi/></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t xml:space='preserve'>").append(xml(normalizeDates(normalizeText(line)))).append("</w:t></w:r></w:p>");
+                body.append("<w:p><w:pPr><w:jc w:val='both'/><w:bidi/></w:pPr><w:r><w:rPr><w:rtl/><w:rFonts w:ascii='DecoType Naskh' w:hAnsi='DecoType Naskh' w:eastAsia='DecoType Naskh' w:cs='DecoType Naskh'/></w:rPr><w:t xml:space='preserve'>").append(xml(normalizeDates(normalizeText(line)))).append("</w:t></w:r></w:p>");
             }
         }
         r.close();
