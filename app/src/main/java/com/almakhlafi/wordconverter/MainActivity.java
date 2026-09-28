@@ -1082,9 +1082,31 @@ public class MainActivity extends AppCompatActivity {
 
     String fixArabicSpacing(String s){
         if(s==null||s.isEmpty())return "";
-        // OCR sometimes drops the space after short Arabic prepositions.
-        s=s.replaceAll("([\\u0600-\\u06FF])(من|في|إلى|الى)(?=(ال|[\\u0621-\\u064A]))","$1 $2 ");
-        s=s.replaceAll("(^|[\\s،؛:])و(من|في|إلى|الى)(?=(ال|[\\u0621-\\u064A]))","$1و$2 ");
+        // Repair OCR tokens that lost word boundaries. Do this only for
+        // standalone short function words, never inside ordinary Arabic words.
+        String ar="[\\u0621-\\u064A]";
+        s=s.replaceAll("(?<!"+ar+")(من)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(في)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(الى)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(إلى)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(التي)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(الذي)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(الذين)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(هذا)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(هذه)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(تلك)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(ذلك)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(على)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(عن)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(مع)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(بعد)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(قبل)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(كما)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(وهو)(?="+ar+")","$1 ");
+        s=s.replaceAll("(?<!"+ar+")(وهي)(?="+ar+")","$1 ");
+        // Also repair a common OCR failure where the previous word is glued
+        // directly to a known standalone word.
+        s=s.replaceAll("("+ar+"{2,})(التي|الذي|الذين|إلى|الى|من|في|على|عن|مع)(?="+ar+")","$1 $2 ");
         s=s.replaceAll("\\s{2,}"," ");
         return s.trim();
     }
