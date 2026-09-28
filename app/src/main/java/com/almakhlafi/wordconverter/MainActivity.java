@@ -45,6 +45,7 @@ public class MainActivity extends AppCompatActivity {
         prefs=getSharedPreferences("settings",MODE_PRIVATE);
         applyTheme();
         super.onCreate(b);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(ui());
     }
 
@@ -94,29 +95,35 @@ public class MainActivity extends AppCompatActivity {
         page.addView(hero,new LinearLayout.LayoutParams(-1,dp(76)));
 
         MaterialCardView salawatCard=card();
-        salawatCard.setCardBackgroundColor(Color.rgb(232,250,242));
-        salawatCard.setStrokeColor(Color.rgb(198,238,220));
+        salawatCard.setBackground(gradient(Color.rgb(82,210,154),Color.rgb(8,105,70),dp(22)));
+        salawatCard.setStrokeColor(Color.rgb(180,246,217));
         salawatCard.setStrokeWidth(dp(1));
+        salawatCard.setCardElevation(dp(7));
         TextView salawat=new TextView(this);
-        salawat.setText("ﷺ صلِّ على محمد صلى الله عليه وسلم وعلى آله\nالطيبين الطاهرين");
-        salawat.setTextColor(greenDark());
+        salawat.setText("ﷺ  صلِّ على محمد صلى الله عليه وسلم وعلى آله\nالطيبين الطاهرين  ﷺ");
+        salawat.setTextColor(Color.WHITE);
         salawat.setTextSize(20);
         salawat.setTypeface(null,Typeface.BOLD);
         salawat.setGravity(Gravity.CENTER);
         salawat.setLineSpacing(0,1.0f);
+        salawat.setShadowLayer(dp(2),0,dp(2),Color.argb(120,0,50,30));
         salawat.setPadding(dp(8),dp(8),dp(8),dp(8));
         salawatCard.addView(salawat,new LinearLayout.LayoutParams(-1,dp(112)));
         page.addView(salawatCard,new LinearLayout.LayoutParams(-1,dp(124)));
 
         MaterialCardView banner=card();
-        banner.setCardBackgroundColor(Color.rgb(35,143,226));
-        banner.setStrokeWidth(0);
+        banner.setBackground(gradient(Color.rgb(73,174,239),Color.rgb(25,106,184),dp(22)));
+        banner.setStrokeColor(Color.rgb(148,215,250));
+        banner.setStrokeWidth(dp(1));
+        banner.setCardElevation(dp(6));
         TextView bannerText=new TextView(this);
         bannerText.setText("تحويل واستخراج جميع\nأنواع الملفات إلى وورد");
         bannerText.setTextColor(Color.WHITE);
         bannerText.setTextSize(23);
+        bannerText.setTypeface(null,Typeface.BOLD);
         bannerText.setGravity(Gravity.CENTER);
         bannerText.setLineSpacing(0,0.95f);
+        bannerText.setShadowLayer(dp(2),0,dp(2),Color.argb(150,0,55,100));
         banner.addView(bannerText,new LinearLayout.LayoutParams(-1,dp(104)));
         LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,dp(108));
         bp.setMargins(0,dp(12),0,dp(12));
