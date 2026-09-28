@@ -618,8 +618,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     String cleanPages(ArrayList<String> pages){
-
-    String cleanPages(ArrayList<String> pages){
         ArrayList<String> cleaned=new ArrayList<>();
         for(String s:pages) cleaned.add(normalizeText(cleanOcr(s==null?"":s)));
         return joinPages(removeRepeatedHeadersFooters(cleaned));
