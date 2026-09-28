@@ -6,18 +6,11 @@ import android.content.*;
 import android.content.res.Configuration;
 import android.graphics.*;
 import android.graphics.drawable.GradientDrawable;
-import android.graphics.Canvas;
-import android.graphics.Paint;
-import android.graphics.ColorMatrix;
-import android.graphics.ColorMatrixColorFilter;
 import android.graphics.pdf.PdfRenderer;
 import android.net.Uri;
 import android.database.Cursor;
 import android.provider.OpenableColumns;
 import android.provider.MediaStore;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import androidx.core.app.NotificationCompat;
 import android.view.*;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
@@ -36,8 +29,7 @@ import javax.xml.parsers.*;
 import org.w3c.dom.*;
 
 public class MainActivity extends AppCompatActivity {
-    static final int PICK=100, CREATE=200, CAMERA=300, TREE=400, NOTIFY=900;
-    static final String CHANNEL_ID="conversion_progress";
+    static final int PICK=100, CREATE=200, CAMERA=300, TREE=400;
     LinearLayout list, root;
     TextView status;
     MaterialCardView selectedCard;
@@ -45,9 +37,6 @@ public class MainActivity extends AppCompatActivity {
     ArrayList<Uri> selected=new ArrayList<>();
     File pendingOutput;
     SharedPreferences prefs;
-    int selectedPdfStartPage=1;
-    int selectedPdfEndPage=-1;
-    String currentOutputName="Word_Al-Makhlafi_Converted.docx";
 
     @Override public void onCreate(Bundle b){
         prefs=getSharedPreferences("settings",MODE_PRIVATE);
@@ -117,17 +106,14 @@ public class MainActivity extends AppCompatActivity {
         page.addView(salawatCard,new LinearLayout.LayoutParams(-1,dp(124)));
 
         MaterialCardView banner=card();
-        banner.setBackground(gradient(Color.rgb(74,181,245),Color.rgb(20,105,190),18));
+        banner.setCardBackgroundColor(Color.rgb(35,143,226));
         banner.setStrokeWidth(0);
-        banner.setCardElevation(dp(4));
         TextView bannerText=new TextView(this);
         bannerText.setText("تحويل واستخراج جميع\nأنواع الملفات إلى وورد");
         bannerText.setTextColor(Color.WHITE);
         bannerText.setTextSize(23);
-        bannerText.setTypeface(null,Typeface.BOLD);
         bannerText.setGravity(Gravity.CENTER);
         bannerText.setLineSpacing(0,0.95f);
-        bannerText.setShadowLayer(dp(2),dp(1),dp(2),Color.argb(110,0,0,0));
         banner.addView(bannerText,new LinearLayout.LayoutParams(-1,dp(104)));
         LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,dp(108));
         bp.setMargins(0,dp(12),0,dp(12));
@@ -511,118 +497,10 @@ public class MainActivity extends AppCompatActivity {
 
     void createOutput(){
         if(selected.isEmpty()){toast("أضف ملفًا أولًا");return;}
-        boolean hasPdf=false;
-        for(Uri u:selected) if(name(u).toLowerCase(Locale.ROOT).endsWith(".pdf")){hasPdf=true;break;}
-        if(hasPdf){showPdfPageSelection();return;}
-        startConversion();
-    }
-
-    void showPdfPageSelection(){
-        LinearLayout box=new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(20),dp(6),dp(20),dp(4));
-
-        TextView h=sectionTitle("اختيار صفحات ملف PDF");
-        h.setTextSize(21);
-        box.addView(h,new LinearLayout.LayoutParams(-1,dp(48)));
-
-        TextView info=new TextView(this);
-        info.setText("اختر تحويل الملف كاملًا أو حدد صفحة واحدة أو نطاقًا مثل: 1-10");
-        info.setTextSize(15);
-        info.setTextColor(text());
-        info.setGravity(Gravity.RIGHT);
-        info.setPadding(4,2,4,12);
-        box.addView(info);
-
-        RadioGroup group=new RadioGroup(this);
-        group.setOrientation(RadioGroup.VERTICAL);
-        group.setGravity(Gravity.RIGHT);
-
-        RadioButton all=new RadioButton(this);
-        all.setText("تحويل جميع الصفحات");
-        all.setTextSize(16);
-        all.setGravity(Gravity.RIGHT);
-        all.setChecked(true);
-
-        RadioButton range=new RadioButton(this);
-        range.setText("تحويل صفحات محددة");
-        range.setTextSize(16);
-        range.setGravity(Gravity.RIGHT);
-
-        group.addView(all);
-        group.addView(range);
-        box.addView(group);
-
-        EditText pages=new EditText(this);
-        pages.setHint("مثال: 1-10 أو 7");
-        pages.setTextSize(17);
-        pages.setSingleLine(true);
-        pages.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
-        pages.setGravity(Gravity.RIGHT);
-        pages.setEnabled(false);
-        pages.setPadding(dp(12),dp(8),dp(12),dp(8));
-        box.addView(pages,new LinearLayout.LayoutParams(-1,dp(56)));
-
-        TextView note=new TextView(this);
-        note.setText("مثال: إذا كان الملف 50 صفحة يمكنك كتابة 1-10، أو 15، أو 20-35.");
-        note.setTextSize(13);
-        note.setTextColor(greenDark());
-        note.setGravity(Gravity.RIGHT);
-        note.setPadding(4,dp(8),4,dp(4));
-        box.addView(note);
-
-        all.setOnClickListener(v->pages.setEnabled(false));
-        range.setOnClickListener(v->{pages.setEnabled(true);pages.requestFocus();});
-
-        AlertDialog dlg=new AlertDialog.Builder(this)
-            .setView(box)
-            .setPositiveButton("بدء التحويل",null)
-            .setNegativeButton("إلغاء",null)
-            .create();
-
-        dlg.setOnShowListener(x->dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
-            if(all.isChecked()){
-                selectedPdfStartPage=1;
-                selectedPdfEndPage=-1;
-                dlg.dismiss();
-                startConversion();
-                return;
-            }
-            String q=pages.getText().toString().trim().replace('–','-').replace('—','-').replace(" ","");
-            if(q.isEmpty()){pages.setError("أدخل رقم الصفحة أو النطاق");return;}
-            try{
-                int start,end;
-                if(q.matches("\\d+")){
-                    start=Integer.parseInt(q);
-                    end=start;
-                }else if(q.matches("\\d+-\\d+")){
-                    String[] p=q.split("-");
-                    start=Integer.parseInt(p[0]);
-                    end=Integer.parseInt(p[1]);
-                    if(start>end){int t=start;start=end;end=t;}
-                }else{
-                    pages.setError("اكتب مثل 7 أو 1-10");
-                    return;
-                }
-                if(start<1){pages.setError("رقم الصفحة يجب أن يبدأ من 1");return;}
-                selectedPdfStartPage=start;
-                selectedPdfEndPage=end;
-                dlg.dismiss();
-                startConversion();
-            }catch(Exception e){pages.setError("رقم الصفحات غير صحيح");}
-        }));
-        dlg.show();
-    }
-
-    void startConversion(){
-        currentOutputName=buildOutputName();
-        showConversionNotification("جاري تحويل الملف",currentOutputName,false);
         progress.setVisibility(View.VISIBLE);
         progress.setIndeterminate(true);
         status.setVisibility(View.VISIBLE);
-        status.setText(selectedPdfEndPage>0
-            ? "بدء التحويل — الصفحات المحددة: "+selectedPdfStartPage+"-"+selectedPdfEndPage
-            : "بدء التحويل — جميع الصفحات...");
+        status.setText("بدء التحويل — لا يوجد حد صفحات مصطنع، ويمكن معالجة أكثر من 500 صفحة...");
         new Thread(()->{
             try{
                 ArrayList<Uri> jobs=new ArrayList<>(selected);
@@ -633,7 +511,7 @@ public class MainActivity extends AppCompatActivity {
                     File direct=copyTemp(jobs.get(0),"docx");
                     pendingOutput=direct;
                     out.close(); tempText.delete();
-                    runOnUiThread(()->{progress.setIndeterminate(false);progress.setProgressCompat(100,true);status.setText("تم تجهيز ملف Word مع الحفاظ على تنسيقه الأصلي.");showConversionNotification("اكتمل التحويل",currentOutputName,true);saveResult();});
+                    runOnUiThread(()->{progress.setIndeterminate(false);progress.setProgressCompat(100,true);status.setText("تم تجهيز ملف Word مع الحفاظ على تنسيقه الأصلي.");saveResult();});
                     return;
                 }
                 int total=jobs.size(), index=0;
@@ -647,22 +525,13 @@ public class MainActivity extends AppCompatActivity {
                     out.flush();
                 }
                 out.close();
-                if(!fileHasUsableText(tempText)){
-                    tempText.delete();
-                    throw new Exception("تمت معالجة الملف ولكن لم يتم استخراج نص قابل للتحويل إلى Word.");
-                }
                 File temp=new File(getCacheDir(),"Word_AlMakhlafi_"+System.currentTimeMillis()+".docx");
                 writeDocxFromStream(temp,tempText);
-                if(!docxHasText(temp)){
-                    temp.delete();
-                    tempText.delete();
-                    throw new Exception("تعذر إنشاء محتوى Word رغم استخراج النص.");
-                }
                 tempText.delete();
                 pendingOutput=temp;
                 runOnUiThread(()->{progress.setIndeterminate(false);progress.setProgressCompat(100,true);status.setText("اكتمل التحويل. جاري اختيار مكان الحفظ...");saveResult();});
             }catch(Exception e){
-                runOnUiThread(()->{progress.setIndeterminate(false);progress.setVisibility(View.GONE);status.setText("تعذر التحويل: "+e.getMessage());showConversionNotification("تعذر التحويل",e.getMessage()==null?"حدث خطأ أثناء التحويل":e.getMessage(),true);toast("تعذر التحويل: "+e.getMessage());});
+                runOnUiThread(()->{progress.setIndeterminate(false);progress.setVisibility(View.GONE);status.setText("تعذر التحويل: "+e.getMessage());toast("تعذر التحويل: "+e.getMessage());});
             }
         }).start();
     }
@@ -672,48 +541,8 @@ public class MainActivity extends AppCompatActivity {
         if(!tree.isEmpty()){try{DocumentFile dir=DocumentFile.fromTreeUri(this,Uri.parse(tree));if(dir!=null&&dir.canWrite()){DocumentFile out=dir.createFile("application/vnd.openxmlformats-officedocument.wordprocessingml.document","Word_Al-Makhlafi_"+System.currentTimeMillis()+".docx");if(out!=null){OutputStream o=getContentResolver().openOutputStream(out.getUri());copyStream(new FileInputStream(pendingOutput),o);pendingOutput.delete();pendingOutput=null;progress.setVisibility(View.GONE);status.setText("تم حفظ الملف في المكان المحدد.");toast("تم الحفظ بنجاح.");return;}}}catch(Exception ignored){}}
         askSaveLocation();
     }
-    void askSaveLocation(){Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");i.putExtra(Intent.EXTRA_TITLE,currentOutputName);startActivityForResult(i,CREATE);}
+    void askSaveLocation(){Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");i.putExtra(Intent.EXTRA_TITLE,"Word_Al-Makhlafi_Converted.docx");startActivityForResult(i,CREATE);}
     void savePendingTo(Uri out){if(pendingOutput==null)return;try{OutputStream o=getContentResolver().openOutputStream(out);copyStream(new FileInputStream(pendingOutput),o);pendingOutput.delete();pendingOutput=null;progress.setVisibility(View.GONE);status.setText("تم حفظ الملف بنجاح.");toast("تم الحفظ بنجاح.");}catch(Exception e){toast("تعذر الحفظ: "+e.getMessage());}}
-    String buildOutputName(){
-        if(selected.size()==1){
-            String n=name(selected.get(0));
-            int dot=n.lastIndexOf('.');
-            if(dot>0)n=n.substring(0,dot);
-            return n+".docx";
-        }
-        return "Word_Al-Makhlafi_Converted.docx";
-    }
-
-    void showConversionNotification(String title,String text,boolean finished){
-        try{
-            NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
-            if(Build.VERSION.SDK_INT>=26){
-                NotificationChannel ch=new NotificationChannel(CHANNEL_ID,"حالة تحويل الملفات",NotificationManager.IMPORTANCE_HIGH);
-                ch.setDescription("إشعارات تحويل الملفات إلى Word");
-                ch.setShowBadge(true);
-                nm.createNotificationChannel(ch);
-            }
-            if(Build.VERSION.SDK_INT>=33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=android.content.pm.PackageManager.PERMISSION_GRANTED){
-                requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},901);
-            }
-            Intent open=new Intent(this,MainActivity.class);
-            open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP|Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            PendingIntent pi=PendingIntent.getActivity(this,0,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
-            NotificationCompat.Builder b=new NotificationCompat.Builder(this,CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_launcher)
-                .setContentTitle(title)
-                .setContentText(text)
-                .setSubText(currentOutputName)
-                .setContentIntent(pi)
-                .setOnlyAlertOnce(true)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setAutoCancel(finished)
-                .setOngoing(!finished);
-            if(!finished)b.setProgress(0,0,true);
-            nm.notify(NOTIFY,b.build());
-        }catch(Exception ignored){}
-    }
-
 
     String extract(Uri u)throws Exception{
         String n=name(u).toLowerCase(Locale.ROOT);
@@ -729,18 +558,15 @@ public class MainActivity extends AppCompatActivity {
         File f=copyTemp(u,"pdf");
         PdfRenderer r=new PdfRenderer(ParcelFileDescriptor.open(f,ParcelFileDescriptor.MODE_READ_ONLY));
         int count=r.getPageCount();
-        int start=Math.max(1,selectedPdfStartPage);
-        int end=selectedPdfEndPage<1?count:Math.min(count,selectedPdfEndPage);
-        if(start>count){r.close();f.delete();throw new Exception("الصفحة المطلوبة ("+start+") غير موجودة. عدد صفحات الملف: "+count);}
         StringBuilder result=new StringBuilder();
-        for(int i=start-1;i<end;i++){
+        for(int i=0;i<count;i++){
             final int page=i+1;
-            runOnUiThread(()->status.setText("تحليل الصفحة "+page+" من "+end+" — أصل الملف "+count+" صفحة"));
+            runOnUiThread(()->status.setText("تحليل تخطيط الصفحة "+page+" من "+count));
             PdfRenderer.Page p=r.openPage(i);
             double pageW=p.getWidth(), pageH=p.getHeight();
-            float scale=Math.min(3.0f,Math.max(1.75f,3000f/Math.max(p.getWidth(),p.getHeight())));
-            int w=Math.max(1400,(int)(p.getWidth()*scale));
-            int h=Math.max(1400,(int)(p.getHeight()*scale));
+            float scale=Math.min(3.0f,Math.max(1.5f,2600f/Math.max(p.getWidth(),p.getHeight())));
+            int w=Math.max(1200,(int)(p.getWidth()*scale));
+            int h=Math.max(1200,(int)(p.getHeight()*scale));
             Bitmap b=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
             b.eraseColor(Color.WHITE);
             p.render(b,null,null,PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
@@ -751,10 +577,12 @@ public class MainActivity extends AppCompatActivity {
                 result.append("<<PDFPAGE ").append(pageW).append(" ").append(pageH).append(" ").append(w).append(" ").append(h).append(">>\n");
                 result.append(pageText).append("<<ENDPDFPAGE>>\n");
             }
+            System.gc();
         }
         r.close();f.delete();
         return result.toString();
     }
+
     String cleanPages(ArrayList<String> pages){
         ArrayList<String> cleaned=new ArrayList<>();
         for(String s:pages) cleaned.add(normalizeText(cleanOcr(s==null?"":s)));
@@ -784,8 +612,7 @@ public class MainActivity extends AppCompatActivity {
         if(!t.init(getFilesDir().getAbsolutePath(),"ara"))throw new Exception("فشل تشغيل OCR العربي");
         t.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO);
         t.setVariable("preserve_interword_spaces","1");
-        t.setVariable("user_defined_dpi","300");
-        t.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz|¦~\u0060^\\");
+        t.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz|¦~\\u0060^\\\\");
         Bitmap prepared=prepareForOcr(b);
         t.setImage(prepared);
         String x=t.getUTF8Text();
@@ -793,6 +620,7 @@ public class MainActivity extends AppCompatActivity {
         if(prepared!=b)prepared.recycle();
         return normalizeText(cleanOcr(x==null?"":x));
     }
+
     String ocrBitmapLayout(Bitmap b)throws Exception{
         if(b==null)throw new Exception("تعذر قراءة الصفحة");
         File td=new File(getFilesDir(),"tessdata");if(!td.exists())td.mkdirs();
@@ -801,14 +629,10 @@ public class MainActivity extends AppCompatActivity {
         if(!t.init(getFilesDir().getAbsolutePath(),"ara"))throw new Exception("فشل تشغيل OCR العربي");
         t.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO);
         t.setVariable("preserve_interword_spaces","1");
-        t.setVariable("user_defined_dpi","300");
-        t.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz|¦~\u0060^\\");
+        t.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz|¦~\\u0060^\\\\");
         Bitmap prepared=prepareForOcr(b);
         t.setImage(prepared);
-
-        // مهم: تنفيذ التعرف الكامل أولًا، ثم استخدام ResultIterator لتحديد مواقع الأسطر.
-        // إذا لم يُرجع Tesseract أسطرًا مكانية، نستخدم النص الكامل كخطة احتياطية حتى لا ينتج Word فارغ.
-        String fullText=t.getUTF8Text();
+        t.getUTF8Text();
         ResultIterator it=t.getResultIterator();
         ArrayList<LayoutLine> lines=new ArrayList<>();
         if(it!=null){
@@ -819,37 +643,18 @@ public class MainActivity extends AppCompatActivity {
                     Rect rc=it.getBoundingRect(TessBaseAPI.PageIteratorLevel.RIL_TEXTLINE);
                     float conf=it.confidence(TessBaseAPI.PageIteratorLevel.RIL_TEXTLINE);
                     tx=normalizeText(cleanOcr(tx==null?"":tx));
-                    if(!tx.isEmpty()&&rc!=null&&rc.width()>3&&rc.height()>3&&conf>=5){
+                    if(!tx.isEmpty()&&rc!=null&&rc.width()>3&&rc.height()>3&&conf>=18){
                         lines.add(new LayoutLine(tx,rc.left,rc.top,rc.width(),rc.height(),conf));
                     }
                 }
             }while(it.next(TessBaseAPI.PageIteratorLevel.RIL_TEXTLINE));
             it.delete();
         }
-
-        // بعض إصدارات/حالات Tesseract قد تعيد النص بنجاح دون أسطر مكانية.
-        // لا نسقط النص في هذه الحالة؛ ننشئ أسطرًا تقريبية ونمررها إلى Word.
-        if(lines.isEmpty() && fullText!=null){
-            String cleaned=normalizeText(cleanOcr(fullText));
-            String[] fallback=cleaned.split("\\R");
-            int y=40;
-            int lineH=Math.max(45,b.getHeight()/Math.max(12,fallback.length+2));
-            for(String s:fallback){
-                s=s.trim();
-                if(s.isEmpty())continue;
-                int h=Math.min(lineH,Math.max(35,b.getHeight()-y));
-                if(h<=0)break;
-                lines.add(new LayoutLine(s,40,y,Math.max(100,b.getWidth()-80),h,100));
-                y+=lineH;
-            }
-        }
-
         t.recycle();
         if(prepared!=b)prepared.recycle();
         Collections.sort(lines,(a,c)->{
             int dy=Math.abs(a.y-c.y);
-            int band=Math.max(10,(int)(Math.min(a.h,c.h)*0.55f));
-            if(dy<=band)return Integer.compare(c.x,a.x);
+            if(dy<=Math.max(10,Math.min(a.h,c.h)/2))return Integer.compare(c.x,a.x);
             return Integer.compare(a.y,c.y);
         });
         StringBuilder out=new StringBuilder();
@@ -859,6 +664,7 @@ public class MainActivity extends AppCompatActivity {
         }
         return out.toString();
     }
+
     static class LayoutLine{
         String text; int x,y,w,h; float confidence;
         LayoutLine(String t,int x,int y,int w,int h,float c){text=t;this.x=x;this.y=y;this.w=w;this.h=h;confidence=c;}
@@ -868,19 +674,20 @@ public class MainActivity extends AppCompatActivity {
     int currentRenderedHeight=1;
 
     Bitmap prepareForOcr(Bitmap src){
-        if(src==null)return null;
-        // نفس فكرة المعالجة الرمادية السابقة، لكن باستخدام Canvas/ColorMatrix
-        // بدل المرور على كل بكسل من Java؛ هذا يقلل زمن التحويل والضغط على الذاكرة.
-        Bitmap out=Bitmap.createBitmap(src.getWidth(),src.getHeight(),Bitmap.Config.ARGB_8888);
-        Canvas canvas=new Canvas(out);
-        ColorMatrix cm=new ColorMatrix();
-        cm.setSaturation(0f);
-        cm.setScale(1.18f,1.18f,1.18f,1f);
-        Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
-        paint.setColorFilter(new ColorMatrixColorFilter(cm));
-        canvas.drawBitmap(src,0,0,paint);
+        int w=src.getWidth(), h=src.getHeight();
+        Bitmap out=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
+        for(int y=0;y<h;y++){
+            for(int x=0;x<w;x++){
+                int p=src.getPixel(x,y);
+                int r=Color.red(p),g=Color.green(p),bl=Color.blue(p);
+                int gray=(r*299+g*587+bl*114)/1000;
+                int v=gray<185?35:255;
+                out.setPixel(x,y,Color.rgb(v,v,v));
+            }
+        }
         return out;
     }
+
     String cleanOcr(String x){
         if(x==null)return "";
         StringBuilder out=new StringBuilder();
@@ -894,109 +701,28 @@ public class MainActivity extends AppCompatActivity {
         String q=out.toString().replaceAll("[A-Za-z]+"," ");
         q=q.replaceAll("[|¦~\\u0060^\\\\]+"," ");
         q=q.replaceAll("([،؛:؟.!-])\\1{2,}","$1");
+        q=q.replaceAll("(?m)^\\s*[|¦~\\u0060^]+\\s*$","");
         q=q.replaceAll("[ ]{2,}"," ");
-        return q.trim();
+        return q;
     }
+
     String normalizeText(String x){
         if(x==null)return "";
         String s=x.replace("\u0640","");
+        // لا نُسقط الهمزات: الحفاظ على أ/إ/آ/ؤ/ئ/ء جزء أساسي من النسخة الجديدة.
         s=s.replaceAll("(?m)[ \\t]+"," ");
         s=s.replaceAll(" *\\n *","\\n");
         s=s.replaceAll(" +([،؛:؟,.!])","$1");
         s=s.replaceAll("([،؛:؟,.!])\\1+","$1");
+        // تصحيحات محافظة؛ لا تُطبّق على كلمات أطول.
         String[] bad={"هاذا","هاذه","هاؤلاء","اللذي","الذيي","التيي","لاكن","ولكنن","مسوول","مسئول","شيى","شئ","جزءا"};
         String[] good={"هذا","هذه","هؤلاء","الذي","الذي","التي","لكن","ولكن","مسؤول","مسؤول","شيء","شيء","جزءاً"};
         for(int i=0;i<bad.length;i++)s=s.replaceAll("(?<![\\u0600-\\u06FF])"+bad[i]+"(?![\\u0600-\\u06FF])",good[i]);
-        s=normalizeDates(s);
         if(prefs.getBoolean("clean",true)){
             s=s.replaceAll("[|¦]{1,}"," ");
             s=s.replaceAll("[ ]{2,}"," ");
         }
         return s.trim();
-    }    String normalizeDates(String s){
-        if(s==null||s.isEmpty())return "";
-        java.util.regex.Pattern p=java.util.regex.Pattern.compile("(?<![0-9٠-٩])(\\d{4}|[٠-٩]{4})[\\\\/-](\\d{1,2}|[٠-٩]{1,2})[\\\\/-](\\d{1,2}|[٠-٩]{1,2})(?![0-9٠-٩])");
-        java.util.regex.Matcher m=p.matcher(s);
-        StringBuffer b=new StringBuffer();
-        while(m.find()){
-            String y=m.group(1),mo=m.group(2),d=m.group(3);
-            m.appendReplacement(b,java.util.regex.Matcher.quoteReplacement(d+"/"+mo+"/"+y));
-        }
-        m.appendTail(b);
-        return b.toString();
-    }
-
-    boolean looksLikeListOrNumberedStart(String s){
-        if(s==null)return false;
-        String q=s.trim();
-        return q.matches("^[0-9٠-٩]+[)\\].:؛-].*")
-            || q.matches("^[أ-ي][)\\].:؛-].*")
-            || q.startsWith("•") || q.startsWith("-");
-    }
-
-    boolean sameParagraph(LayoutLine a,LayoutLine b,double pageW,double sy){
-        if(a==null||b==null)return false;
-        double gap=(b.y-(a.y+a.h))*sy;
-        if(gap<0)gap=0;
-        double avgH=((a.h+b.h)/2.0)*sy;
-        if(looksLikeListOrNumberedStart(b.text))return false;
-        return gap <= Math.max(10.0,avgH*1.55);
-    }
-
-    void appendPdfPage(StringBuilder body,ArrayList<LayoutLine> lines,double pageW,double pageH,int renderW,int renderH){
-        if(lines==null||lines.isEmpty())return;
-        double sx=pageW/Math.max(1,renderW), sy=pageH/Math.max(1,renderH);
-        ArrayList<ArrayList<LayoutLine>> paragraphs=new ArrayList<>();
-        ArrayList<LayoutLine> cur=new ArrayList<>();
-        for(LayoutLine l:lines){
-            if(cur.isEmpty())cur.add(l);
-            else if(sameParagraph(cur.get(cur.size()-1),l,pageW,sy))cur.add(l);
-            else{paragraphs.add(cur);cur=new ArrayList<>();cur.add(l);}
-        }
-        if(!cur.isEmpty())paragraphs.add(cur);
-        for(int pi=0;pi<paragraphs.size();pi++){
-            ArrayList<LayoutLine> para=paragraphs.get(pi);
-            LayoutLine first=para.get(0);
-            double firstX=first.x*sx, firstW=first.w*sx;
-            double rightPt=Math.max(0,pageW-(firstX+firstW));
-            int font=(int)Math.max(10,Math.min(22,(first.h*sy)*0.82));
-            int before=0;
-            if(pi>0){
-                LayoutLine pl=paragraphs.get(pi-1).get(paragraphs.get(pi-1).size()-1);
-                double gap=Math.max(0,(first.y-(pl.y+pl.h))*sy);
-                before=(int)Math.min(360,Math.max(0,gap*12));
-            }
-            // Word: ضبط كامل + اتجاه RTL، مع المحافظة على موضع الفقرة الأصلي.
-            body.append("<w:p><w:pPr><w:jc w:val='both'/><w:bidi/>");
-            body.append("<w:ind w:right='").append((int)(rightPt*20)).append("'/>");
-            body.append("<w:spacing w:before='").append(before).append("' w:after='0' w:line='").append(Math.max(240,(int)((first.h*sy)*20))).append("' w:lineRule='auto'/></w:pPr>");
-            for(int i=0;i<para.size();i++){
-                LayoutLine l=para.get(i);
-                String tx=normalizeDates(normalizeText(cleanOcr(l.text)));
-                if(tx.isEmpty())continue;
-                int fs=(int)Math.max(10,Math.min(22,(l.h*sy)*0.82));
-                boolean heading=isPdfHeading(tx, i==0, para.size(), fs);
-                body.append("<w:r><w:rPr><w:rtl/><w:bidi/><w:rFonts w:ascii='DecoType Naskh' w:hAnsi='DecoType Naskh' w:eastAsia='DecoType Naskh' w:cs='DecoType Naskh'/><w:sz w:val='").append(fs*2).append("'/><w:szCs w:val='").append(fs*2).append("'/>");
-                if(heading)body.append("<w:b/><w:bCs/>");
-                body.append("</w:rPr>");
-                body.append("<w:t xml:space='preserve'>").append(xml(tx)).append("</w:t></w:r>");
-                if(i<para.size()-1)body.append("<w:r><w:br/></w:r>");
-            }
-            body.append("</w:p>");
-        }
-        body.append("<w:p><w:pPr><w:sectPr><w:type w:val='nextPage'/><w:pgSz w:w='").append((int)(pageW*20)).append("' w:h='").append((int)(pageH*20)).append("'/><w:pgMar w:top='360' w:right='360' w:bottom='360' w:left='360'/></w:sectPr></w:pPr></w:p>");
-    }
-
-
-    boolean isPdfHeading(String s,boolean first,int paragraphSize,int fs){
-        if(s==null)return false;
-        String q=s.trim();
-        if(q.isEmpty())return false;
-        if(q.matches("^(الباب|الفصل|المبحث|المطلب|الفرع|القسم|أولاً|ثانياً|ثالثاً|رابعاً|خامساً|سادساً|سابعاً|ثامناً|تاسعاً|عاشراً)(\\s|:|$).*")) return true;
-        if(q.matches("^[0-9٠-٩]+[\\)\\].:؛-]\\s*.*") || q.matches("^[أ-ي][\\)\\].:؛-]\\s*.*")) return true;
-        if(q.endsWith(":") || q.endsWith("؛") || q.endsWith("؟")) return q.length()<=90;
-        if(first && paragraphSize<=2 && q.length()<=70 && !q.matches(".*[،,؛;]\\s*$")) return true;
-        return false;
     }
 
     void asset(String a,File d)throws Exception{if(d.exists()&&d.length()>1000)return;InputStream in=getAssets().open(a);FileOutputStream o=new FileOutputStream(d);byte[] b=new byte[8192];int n;while((n=in.read(b))>0)o.write(b,0,n);in.close();o.close();}
@@ -1184,79 +910,51 @@ public class MainActivity extends AppCompatActivity {
         put(z,"word/_rels/document.xml.rels","<?xml version='1.0'?><Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'/>");
         BufferedReader r=new BufferedReader(new InputStreamReader(new FileInputStream(source),"UTF-8"),65536);
         StringBuilder body=new StringBuilder("<w:document xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'><w:body>");
-        String line; boolean table=false,pdfPage=false;
-        double pageW=595,pageH=842; int renderW=1,renderH=1;
-        ArrayList<LayoutLine> pdfLines=new ArrayList<>();
+        String line; boolean table=false,pdfPage=false; double pageW=595,pageH=842; int renderW=1,renderH=1; int prevY=-1,prevH=0;
         while((line=r.readLine())!=null){
             if(line.startsWith("<<PDFPAGE ")){
                 String[] a=line.substring(10,line.length()-2).trim().split(" ");
                 if(a.length>=4){pageW=Double.parseDouble(a[0]);pageH=Double.parseDouble(a[1]);renderW=Integer.parseInt(a[2]);renderH=Integer.parseInt(a[3]);}
-                pdfPage=true;pdfLines.clear();continue;
+                pdfPage=true;prevY=-1;prevH=0;continue;
             }
             if(pdfPage&&line.startsWith("<<L ")&&line.contains(">>")){
                 int k=line.indexOf(">>");String[] a=line.substring(4,k).trim().split(" ");
                 if(a.length>=4){
-                    try{
-                        int x=Integer.parseInt(a[0]),y=Integer.parseInt(a[1]),ww=Integer.parseInt(a[2]),hh=Integer.parseInt(a[3]);
-                        String tx=normalizeText(cleanOcr(line.substring(k+2)));
-                        if(!tx.isEmpty()&&ww>3&&hh>3)pdfLines.add(new LayoutLine(tx,x,y,ww,hh,100));
-                    }catch(Exception ignored){}
+                    int x=Integer.parseInt(a[0]),y=Integer.parseInt(a[1]),ww=Integer.parseInt(a[2]),hh=Integer.parseInt(a[3]);
+                    String tx=normalizeText(cleanOcr(line.substring(k+2)));
+                    if(!tx.isEmpty()){
+                        double sx=pageW/Math.max(1,renderW),sy=pageH/Math.max(1,renderH);
+                        double xPt=x*sx,yPt=y*sy,wPt=ww*sx,hPt=hh*sy;
+                        double rightPt=Math.max(0,pageW-(xPt+wPt));
+                        double gapPt=prevY<0?Math.max(0,yPt):Math.max(0,yPt-(prevY+prevH)*sy);
+                        int before=(int)Math.min(1800,Math.max(0,gapPt*20));
+                        int font=(int)Math.max(9,Math.min(22,hPt*.82));
+                        String jc=(xPt+wPt/2>pageW*.40&&xPt+wPt/2<pageW*.60)?"center":"right";
+                        body.append("<w:p><w:pPr><w:jc w:val='").append(jc).append("'/><w:bidi/>");
+                        if("right".equals(jc))body.append("<w:ind w:right='").append((int)(rightPt*20)).append("'/>");
+                        body.append("<w:spacing w:before='").append(before).append("' w:after='0' w:line='").append(Math.max(240,(int)(hPt*20))).append("' w:lineRule='exact'/></w:pPr>");
+                        body.append("<w:r><w:rPr><w:rtl/><w:sz w:val='").append(font*2).append("'/><w:szCs w:val='").append(font*2).append("'/></w:rPr><w:t xml:space='preserve'>").append(xml(tx)).append("</w:t></w:r></w:p>");
+                        prevY=y;prevH=hh;
+                    }
                 }
                 continue;
             }
             if(pdfPage&&line.startsWith("<<ENDPDFPAGE>>")){
-                appendPdfPage(body,pdfLines,pageW,pageH,renderW,renderH);
-                pdfPage=false;pdfLines.clear();continue;
+                body.append("<w:p><w:pPr><w:sectPr><w:type w:val='nextPage'/><w:pgSz w:w='").append((int)(pageW*20)).append("' w:h='").append((int)(pageH*20)).append("'/><w:pgMar w:top='360' w:right='360' w:bottom='360' w:left='360'/></w:sectPr></w:pPr></w:p>");
+                pdfPage=false;prevY=-1;prevH=0;continue;
             }
             if(pdfPage)continue;
-            if(line.equals("<<TABLE>>")){
-                table=true;
-                body.append("<w:tbl><w:tblPr><w:tblBorders><w:top w:val='single'/><w:left w:val='single'/><w:bottom w:val='single'/><w:right w:val='single'/><w:insideH w:val='single'/><w:insideV w:val='single'/></w:tblBorders></w:tblPr>");
-                continue;
-            }
+            if(line.equals("<<TABLE>>")){table=true;body.append("<w:tbl><w:tblPr><w:tblBorders><w:top w:val='single'/><w:left w:val='single'/><w:bottom w:val='single'/><w:right w:val='single'/><w:insideH w:val='single'/><w:insideV w:val='single'/></w:tblBorders></w:tblPr>");continue;}
             if(line.equals("<</TABLE>>")){table=false;body.append("</w:tbl>");continue;}
             if(table){
-                body.append("<w:tr>");
-                for(String cell:line.split("\\t",-1)){
-                    body.append("<w:tc><w:p><w:pPr><w:jc w:val='both'/><w:bidi/></w:pPr><w:r><w:rPr><w:rtl/><w:rFonts w:ascii='DecoType Naskh' w:hAnsi='DecoType Naskh' w:eastAsia='DecoType Naskh' w:cs='DecoType Naskh'/></w:rPr><w:t xml:space='preserve'>").append(xml(normalizeDates(normalizeText(cell)))).append("</w:t></w:r></w:p></w:tc>");
-                }
-                body.append("</w:tr>");
+                body.append("<w:tr>");for(String cell:line.split("\\t",-1))body.append("<w:tc><w:p><w:pPr><w:jc w:val='right'/><w:bidi/></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t xml:space='preserve'>").append(xml(cell)).append("</w:t></w:r></w:p></w:tc>");body.append("</w:tr>");
             }else if(!line.trim().isEmpty()){
-                body.append("<w:p><w:pPr><w:jc w:val='both'/><w:bidi/></w:pPr><w:r><w:rPr><w:rtl/><w:rFonts w:ascii='DecoType Naskh' w:hAnsi='DecoType Naskh' w:eastAsia='DecoType Naskh' w:cs='DecoType Naskh'/></w:rPr><w:t xml:space='preserve'>").append(xml(normalizeDates(normalizeText(line)))).append("</w:t></w:r></w:p>");
+                body.append("<w:p><w:pPr><w:jc w:val='right'/><w:bidi/></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t xml:space='preserve'>").append(xml(line)).append("</w:t></w:r></w:p>");
             }
         }
         r.close();
         body.append("<w:sectPr><w:pgSz w:w='11906' w:h='16838'/><w:pgMar w:top='720' w:right='720' w:bottom='720' w:left='720'/></w:sectPr></w:body></w:document>");
         put(z,"word/document.xml",body.toString());z.close();
-    }
-    boolean fileHasUsableText(File f)throws Exception{
-        if(f==null||!f.exists()||f.length()==0)return false;
-        BufferedReader r=new BufferedReader(new InputStreamReader(new FileInputStream(f),"UTF-8"),65536);
-        String line;
-        int useful=0;
-        while((line=r.readLine())!=null){
-            String q=cleanOcr(line);
-            if(!q.trim().isEmpty()) useful++;
-            if(useful>=2){r.close();return true;}
-        }
-        r.close();
-        return useful>0;
-    }
-
-    boolean docxHasText(File f)throws Exception{
-        if(f==null||!f.exists()||f.length()==0)return false;
-        ZipFile z=new ZipFile(f);
-        try{
-            ZipEntry e=z.getEntry("word/document.xml");
-            if(e==null)return false;
-            InputStream in=z.getInputStream(e);
-            ByteArrayOutputStream b=new ByteArrayOutputStream();
-            byte[] buf=new byte[8192]; int n;
-            while((n=in.read(buf))>0)b.write(buf,0,n);
-            in.close();
-            String s=new String(b.toByteArray(),"UTF-8");
-            return s.contains("<w:t") && s.matches("(?s).*<w:t[^>]*>[^<\\s][^<]*</w:t>.*");
-        }finally{z.close();}
     }
 
     void put(ZipOutputStream z,String n,String s)throws Exception{z.putNextEntry(new ZipEntry(n));z.write(s.getBytes("UTF-8"));z.closeEntry();}
