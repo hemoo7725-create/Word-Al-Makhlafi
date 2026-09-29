@@ -731,7 +731,7 @@ public class MainActivity extends AppCompatActivity {
             if(s.length()>0)s.append(' ');
             s.append(w.text);
             left=Math.min(left,w.x);right=Math.max(right,w.x+w.w);
-            top=Math.min(top,w.y);bottom=Math.max(bottom,w.y+w.h);conf+=w.conf;
+            top=Math.min(top,w.y);bottom=Math.max(bottom,w.y+w.h);conf+=w.confidence;
         }
         return new LayoutLine(fixArabicSpacing(s.toString()),left,top,Math.max(1,right-left),Math.max(1,bottom-top),conf/Math.max(1,ws.size()));
     }
