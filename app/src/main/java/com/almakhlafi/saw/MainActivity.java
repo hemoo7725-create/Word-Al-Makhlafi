@@ -20,7 +20,7 @@ public class MainActivity extends Activity {
     Button mic, stop;
     SpeechRecognizer sr;
     Handler handler = new Handler();
-    boolean listening=false, destroying=false, starting=false;
+    boolean listening=false, destroying=false, starting=false, appInForeground=true;
     String pendingHtml="", subject="", committedText="", liveText="";
     Map<String,String> dict=new LinkedHashMap<>();
     android.content.SharedPreferences prefs;
@@ -187,7 +187,7 @@ public class MainActivity extends Activity {
             public void onBeginningOfSpeech(){status.setText("تحدث الآن...");}
             public void onRmsChanged(float x){}
             public void onBufferReceived(byte[] x){}
-            public void onEndOfSpeech(){if(listening)status.setText("ألتقط بقية الكلام...");}
+            public void onEndOfSpeech(){if(listening)status.setText("صمت مؤقت — التسجيل ما زال مستمرًا.");}
             public void onError(int e){
                 liveText="";
                 liveView.setText("");
@@ -199,6 +199,7 @@ public class MainActivity extends Activity {
                 if(a!=null&&!a.isEmpty()){
                     liveText=cleanForDisplay(a.get(0));
                     liveView.setText("جاري الالتقاط: "+liveText);
+                    renderLiveText();
                 }
             }
             public void onResults(Bundle x){
@@ -239,6 +240,19 @@ public class MainActivity extends Activity {
     }
 
     String cleanForDisplay(String s){return normalize(processCommands(s));}
+
+    void renderLiveText(){
+        String base=committedText==null?"":committedText;
+        String display=base;
+        if(liveText!=null&&!liveText.trim().isEmpty()){
+            if(display.isEmpty()) display=liveText;
+            else if(!display.endsWith("\n")&&!startsPunctuation(liveText)) display+=" "+liveText;
+            else display+=liveText;
+        }
+        editor.setText(display);
+        editor.setSelection(editor.length());
+        updateCount();
+    }
 
     void commitSegment(String s){
         String o=cleanForDisplay(s);
@@ -353,8 +367,25 @@ public class MainActivity extends Activity {
     }
     String esc(String s){return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;");}
 
-    @Override protected void onPause(){super.onPause();if(isFinishing())stopListening();}
-    @Override protected void onDestroy(){destroying=true;listening=false;if(sr!=null)sr.destroy();super.onDestroy();}
+    @Override protected void onStart(){
+        super.onStart();
+        appInForeground=true;
+    }
+
+    @Override protected void onStop(){
+        super.onStop();
+        appInForeground=false;
+        if(!isChangingConfigurations() && listening){
+            stopListening();
+        }
+    }
+
+    @Override protected void onDestroy(){
+        destroying=true;
+        listening=false;
+        if(sr!=null)sr.destroy();
+        super.onDestroy();
+    }
 
     static class GradientDrawableBox extends android.graphics.drawable.GradientDrawable{
         GradientDrawableBox(int color,int radius){setColor(color);setCornerRadius(radius);}
