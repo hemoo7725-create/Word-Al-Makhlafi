@@ -152,7 +152,6 @@ public class MainActivity extends Activity {
         status.setText("تم فتح الموضوع: "+subject);
     }
 
-        return s.replaceAll("\\s+([،.:؟!؛)])","$1").replaceAll("\\(\\s+","(").replaceAll("\\s+([”])","$1").trim();
 
     void saveCurrent(){
         if(subject==null || subject.trim().isEmpty()){newSubject(true);return;}
