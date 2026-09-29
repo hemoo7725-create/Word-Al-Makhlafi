@@ -152,7 +152,7 @@ public class MainActivity extends Activity {
         status.setText("تم فتح الموضوع: "+subject);
     }
 
-        return s.replaceAll("\\\\s+([،.:؟!؛)])","$1").replaceAll("\\\\(\\\\s+","(").replaceAll("\\\\s+([”])","$1").trim();
+        return s.replaceAll("\\s+([،.:؟!؛)])","$1").replaceAll("\\(\\s+","(").replaceAll("\\s+([”])","$1").trim();
 
     void saveCurrent(){
         if(subject==null || subject.trim().isEmpty()){newSubject(true);return;}
@@ -260,7 +260,7 @@ public class MainActivity extends Activity {
         for(String[]x:p)s=s.replace(x[0],x[1]);
         for(Map.Entry<String,String>x:dict.entrySet())s=s.replace(x.getKey(),x.getValue());
         s=applyTanwin(s);
-        return s.replaceAll("\\\\s+([،.:؟!؛)])","$1").replaceAll("\\\\(\\\\s+","(").replaceAll("\\\\s+([”])","$1").trim();
+        return s.replaceAll("\\s+([،.:؟!؛)])","$1").replaceAll("\\(\\s+","(").replaceAll("\\s+([”])","$1").trim();
     }
 
     String applyTanwin(String s){
