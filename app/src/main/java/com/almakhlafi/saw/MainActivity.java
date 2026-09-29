@@ -230,9 +230,9 @@ public class MainActivity extends Activity {
             i.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS,true);
             i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS,5);
             i.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE,false);
-            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,3500L);
-            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,1200L);
-            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,2500L);
+            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,65000L);
+            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,1000L);
+            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,60000L);
             sr.startListening(i);
         }catch(Exception e){
             if(listening)handler.postDelayed(()->listenOnce(),400);
