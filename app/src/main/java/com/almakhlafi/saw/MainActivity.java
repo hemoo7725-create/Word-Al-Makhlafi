@@ -6,6 +6,10 @@ import android.content.*;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.drawable.Drawable;
+import android.media.AudioManager;
 import android.os.*;
 import android.speech.*;
 import android.text.InputType;
@@ -18,6 +22,12 @@ public class MainActivity extends Activity {
     EditText editor;
     TextView status, subjectView, liveView, countView;
     Button mic, stop;
+    View rootView;
+    boolean showRecognitionChanges=true, keepScreenOn=true, mutePhone=false, muteMedia=false, showErrors=true, longSpeech=true, drawLines=false, dynamicFont=false;
+    int mainButtonHeight=58;
+    float editorFontSize=18f;
+    int savedRing=-1, savedNotification=-1, savedMusic=-1;
+    ScaleGestureDetector scaleDetector;
     SpeechRecognizer sr;
     Handler handler = new Handler();
     boolean listening=false, destroying=false, starting=false, appInForeground=true;
@@ -38,6 +48,7 @@ public class MainActivity extends Activity {
         prefs=getSharedPreferences("almakhlafi_data",0);
         loadDictionary();
         buildUi();
+        loadSettings();
         setupRecognizer();
         if(Build.VERSION.SDK_INT>=23 && checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED)
             requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},44);
@@ -46,6 +57,7 @@ public class MainActivity extends Activity {
 
     void buildUi(){
         LinearLayout root=new LinearLayout(this);
+        rootView=root;
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(10),dp(10),dp(10),dp(10));
         root.setBackgroundColor(LIGHT);
@@ -64,12 +76,14 @@ public class MainActivity extends Activity {
 
         LinearLayout tools=new LinearLayout(this);
         tools.setPadding(0,dp(7),0,dp(5));
-        Button newTopic=btn("＋ موضوع جديد"), history=btn("📚 سجل المواضيع");
+        Button newTopic=btn("＋ موضوع جديد"), history=btn("📚 سجل المواضيع"), settings=btn("⚙ الإعدادات");
         tools.addView(newTopic,new LinearLayout.LayoutParams(0,dp(46),1));
         tools.addView(history,new LinearLayout.LayoutParams(0,dp(46),1));
+        tools.addView(settings,new LinearLayout.LayoutParams(0,dp(46),1));
         root.addView(tools);
         newTopic.setOnClickListener(v->newSubject(true));
         history.setOnClickListener(v->showHistory());
+        settings.setOnClickListener(v->settingsDialog());
 
         LinearLayout statusCard=new LinearLayout(this);
         statusCard.setPadding(dp(12),dp(7),dp(12),dp(7));
@@ -103,7 +117,7 @@ public class MainActivity extends Activity {
         root.addView(liveBox);
 
         editor=new EditText(this);
-        editor.setTextSize(18);
+        editor.setTextSize(editorFontSize);
         editor.setTextColor(Color.rgb(25,35,31));
         editor.setGravity(Gravity.TOP|Gravity.RIGHT);
         editor.setHint("النص النهائي المصحح سيظهر هنا...");
@@ -111,6 +125,7 @@ public class MainActivity extends Activity {
         editor.setPadding(dp(16),dp(16),dp(16),dp(16));
         editor.setBackground(cardBg(Color.WHITE));
         editor.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        editor.setOnTouchListener((v,e)->{ if(dynamicFont && scaleDetector!=null) scaleDetector.onTouchEvent(e); return false; });
         root.addView(editor,new LinearLayout.LayoutParams(-1,0,1));
 
         LinearLayout actions=new LinearLayout(this);
@@ -125,7 +140,210 @@ public class MainActivity extends Activity {
         setContentView(root);
     }
 
-    TextView statusView(String s){TextView v=tv(s,13,Color.rgb(25,70,55));v.setGravity(Gravity.CENTER_VERTICAL|Gravity.RIGHT);return v;}
+    
+    void loadSettings(){
+        showRecognitionChanges=prefs.getBoolean("show_changes",true);
+        keepScreenOn=prefs.getBoolean("keep_screen",true);
+        mutePhone=prefs.getBoolean("mute_phone",false);
+        muteMedia=prefs.getBoolean("mute_media",false);
+        showErrors=prefs.getBoolean("show_errors",true);
+        longSpeech=prefs.getBoolean("long_speech",true);
+        drawLines=prefs.getBoolean("draw_lines",false);
+        dynamicFont=prefs.getBoolean("dynamic_font",false);
+        mainButtonHeight=prefs.getInt("button_height",58);
+        editorFontSize=prefs.getFloat("font_size",18f);
+        if(editor!=null) editor.setTextSize(editorFontSize);
+        if(scaleDetector==null) initScaleDetector();
+        applyScreenSetting();
+        applyAudioSettings();
+        applyVisualSettings();
+    }
+
+    void initScaleDetector(){
+        scaleDetector=new ScaleGestureDetector(this,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
+            public boolean onScale(ScaleGestureDetector d){
+                if(!dynamicFont)return false;
+                editorFontSize=Math.max(14f,Math.min(32f,editorFontSize*d.getScaleFactor()));
+                editor.setTextSize(editorFontSize);
+                prefs.edit().putFloat("font_size",editorFontSize).apply();
+                return true;
+            }
+        });
+    }
+
+    void applyScreenSetting(){
+        if(keepScreenOn)getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
+    void applyAudioSettings(){
+        try{
+            AudioManager am=(AudioManager)getSystemService(AUDIO_SERVICE);
+            if(mutePhone){
+                if(savedRing<0)savedRing=am.getStreamVolume(AudioManager.STREAM_RING);
+                if(savedNotification<0)savedNotification=am.getStreamVolume(AudioManager.STREAM_NOTIFICATION);
+                am.setStreamVolume(AudioManager.STREAM_RING,0,0);
+                am.setStreamVolume(AudioManager.STREAM_NOTIFICATION,0,0);
+            }else{
+                if(savedRing>=0)am.setStreamVolume(AudioManager.STREAM_RING,savedRing,0);
+                if(savedNotification>=0)am.setStreamVolume(AudioManager.STREAM_NOTIFICATION,savedNotification,0);
+                savedRing=savedNotification=-1;
+            }
+            if(muteMedia){
+                if(savedMusic<0)savedMusic=am.getStreamVolume(AudioManager.STREAM_MUSIC);
+                am.setStreamVolume(AudioManager.STREAM_MUSIC,0,0);
+            }else{
+                if(savedMusic>=0)am.setStreamVolume(AudioManager.STREAM_MUSIC,savedMusic,0);
+                savedMusic=-1;
+            }
+        }catch(Exception e){}
+    }
+
+    void applyVisualSettings(){
+        if(editor!=null){
+            editor.setTextSize(editorFontSize);
+            if(drawLines)editor.setBackground(new RuledDrawable(Color.WHITE,Color.rgb(220,230,225),dp(30)));
+            else editor.setBackground(cardBg(Color.WHITE));
+        }
+        if(liveView!=null)liveView.setVisibility(showRecognitionChanges?View.VISIBLE:View.GONE);
+        if(mic!=null){
+            LinearLayout.LayoutParams a=(LinearLayout.LayoutParams)mic.getLayoutParams();
+            if(a!=null){a.height=dp(mainButtonHeight);mic.setLayoutParams(a);}
+        }
+        if(stop!=null){
+            LinearLayout.LayoutParams a=(LinearLayout.LayoutParams)stop.getLayoutParams();
+            if(a!=null){a.height=dp(mainButtonHeight);stop.setLayoutParams(a);}
+        }
+    }
+
+    Switch settingSwitch(LinearLayout box,String title,String summary,boolean value,CompoundButton.OnCheckedChangeListener listener){
+        LinearLayout row=new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(dp(10),dp(7),dp(10),dp(7));
+        row.setBackground(cardBg(Color.WHITE));
+        Switch sw=new Switch(this);
+        sw.setText(title);
+        sw.setTextSize(16);
+        sw.setTextColor(DARK);
+        sw.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+        sw.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        sw.setChecked(value);
+        TextView sub=tv(summary,11,Color.rgb(95,110,104));
+        sub.setGravity(Gravity.RIGHT);
+        row.addView(sw,new LinearLayout.LayoutParams(-1,dp(48)));
+        row.addView(sub,new LinearLayout.LayoutParams(-1,dp(30)));
+        box.addView(row,new LinearLayout.LayoutParams(-1,dp(88)));
+        sw.setOnCheckedChangeListener(listener);
+        return sw;
+    }
+
+    void settingsDialog(){
+        ScrollView scroll=new ScrollView(this);
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(12),dp(6),dp(12),dp(18));
+        box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        scroll.addView(box);
+
+        TextView info=tv("إعدادات المخلافي صوت",22,GREEN);
+        info.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        box.addView(info,new LinearLayout.LayoutParams(-1,dp(58)));
+
+        settingSwitch(box,"وضع التعرف المستمر","يستمر التعرف ويعيد تشغيل جلسة الاستماع تلقائيًا.",true,(b,v)->{});
+        settingSwitch(box,"عرض تغييرات التعرف","إظهار/إخفاء النص الجاري التقاطه أثناء الكلام.",showRecognitionChanges,(b,v)->{
+            showRecognitionChanges=v;prefs.edit().putBoolean("show_changes",v).apply();applyVisualSettings();
+        });
+        settingSwitch(box,"إبقاء الشاشة في وضع التشغيل","منع إطفاء الشاشة أثناء استخدام التطبيق.",keepScreenOn,(b,v)->{
+            keepScreenOn=v;prefs.edit().putBoolean("keep_screen",v).apply();applyScreenSetting();
+        });
+        settingSwitch(box,"تعطيل أصوات الهاتف","كتم نغمة الرنين والإشعارات أثناء استخدام الإعداد.",mutePhone,(b,v)->{
+            mutePhone=v;prefs.edit().putBoolean("mute_phone",v).apply();applyAudioSettings();
+        });
+        settingSwitch(box,"كتم صوت الوسائط","كتم صوت الوسائط أثناء استخدام التطبيق.",muteMedia,(b,v)->{
+            muteMedia=v;prefs.edit().putBoolean("mute_media",v).apply();applyAudioSettings();
+        });
+        settingSwitch(box,"إظهار رسائل الخطأ","إظهار تفاصيل أخطاء التعرف بدل تجاهلها بصمت.",showErrors,(b,v)->{
+            showErrors=v;prefs.edit().putBoolean("show_errors",v).apply();
+        });
+        settingSwitch(box,"الأمثل للكلام الطويل","رفع مهلة الصمت قبل إنهاء جلسة التعرف.",longSpeech,(b,v)->{
+            longSpeech=v;prefs.edit().putBoolean("long_speech",v).apply();
+        });
+        settingSwitch(box,"تغيير حجم النص عن طريق لفتة التكبير","كبّر أو صغّر النص بإصبعين داخل مربع النص.",dynamicFont,(b,v)->{
+            dynamicFont=v;prefs.edit().putBoolean("dynamic_font",v).apply();
+        });
+
+        TextView appearance=tv("المظهر",18,Color.rgb(90,100,105));
+        appearance.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        box.addView(appearance,new LinearLayout.LayoutParams(-1,dp(50)));
+        Button theme=btn("السمة: "+prefs.getString("theme","فاتح"));
+        box.addView(theme,new LinearLayout.LayoutParams(-1,dp(52)));
+        theme.setOnClickListener(v->chooseTheme(theme));
+
+        TextView fontTitle=tv("الخط",18,Color.rgb(90,100,105));
+        fontTitle.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        box.addView(fontTitle,new LinearLayout.LayoutParams(-1,dp(50)));
+        Button font=btn("نوع الخط: "+prefs.getString("font","افتراضي"));
+        box.addView(font,new LinearLayout.LayoutParams(-1,dp(52)));
+        font.setOnClickListener(v->chooseFont(font));
+
+        TextView sizeTitle=tv("حجم الخط",18,Color.rgb(90,100,105));
+        sizeTitle.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        box.addView(sizeTitle,new LinearLayout.LayoutParams(-1,dp(48)));
+        SeekBar size=new SeekBar(this);
+        size.setMax(18);size.setProgress((int)Math.max(0,Math.min(18,editorFontSize-14)));
+        box.addView(size,new LinearLayout.LayoutParams(-1,dp(52)));
+        size.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+            public void onProgressChanged(SeekBar b,int p,boolean from){editorFontSize=14+p;editor.setTextSize(editorFontSize);prefs.edit().putFloat("font_size",editorFontSize).apply();}
+            public void onStartTrackingTouch(SeekBar b){} public void onStopTrackingTouch(SeekBar b){}
+        });
+
+        settingSwitch(box,"ارسم خطوطًا","إظهار خطوط مساعدة داخل مساحة الكتابة.",drawLines,(b,v)->{
+            drawLines=v;prefs.edit().putBoolean("draw_lines",v).apply();applyVisualSettings();
+        });
+
+        TextView buttonTitle=tv("حجم الزر الرئيسي",18,Color.rgb(90,100,105));
+        buttonTitle.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        box.addView(buttonTitle,new LinearLayout.LayoutParams(-1,dp(48)));
+        SeekBar bs=new SeekBar(this);bs.setMax(50);bs.setProgress(Math.max(0,Math.min(50,mainButtonHeight-40)));
+        box.addView(bs,new LinearLayout.LayoutParams(-1,dp(52)));
+        bs.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+            public void onProgressChanged(SeekBar b,int p,boolean from){mainButtonHeight=40+p;prefs.edit().putInt("button_height",mainButtonHeight).apply();applyVisualSettings();}
+            public void onStartTrackingTouch(SeekBar b){} public void onStopTrackingTouch(SeekBar b){}
+        });
+
+        TextView rec=tv("السجل",18,Color.rgb(90,100,105));
+        rec.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        box.addView(rec,new LinearLayout.LayoutParams(-1,dp(50)));
+        Button saved=btn("حفظ المحفوظات على القرص\nعدد المحفوظات: "+prefs.getInt("history_limit",50));
+        box.addView(saved,new LinearLayout.LayoutParams(-1,dp(60)));
+        saved.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("حفظ المحفوظات على القرص")
+            .setMessage("يحفظ التطبيق نصوص المواضيع تلقائيًا داخل بياناته المحلية. التسجيل الصوتي الخام يحتاج محرك التقاط مستقلًا عن SpeechRecognizer، لذلك لن أفعّل تسجيلًا صوتيًا وهميًا أو يقطع التعرف.")
+            .setPositiveButton("حسنًا",null).show());
+
+        new AlertDialog.Builder(this).setTitle("الإعدادات").setView(scroll).setPositiveButton("إغلاق",null).show();
+    }
+
+    void chooseTheme(Button b){
+        String[] a={"فاتح","داكن","أخضر"};
+        new AlertDialog.Builder(this).setTitle("السمة").setItems(a,(d,w)->{
+            String t=a[w];prefs.edit().putString("theme",t).apply();
+            if("داكن".equals(t)){rootView.setBackgroundColor(Color.rgb(25,30,28));editor.setTextColor(Color.WHITE);}
+            else if("أخضر".equals(t)){rootView.setBackgroundColor(Color.rgb(236,248,242));editor.setTextColor(Color.rgb(20,45,35));}
+            else {rootView.setBackgroundColor(LIGHT);editor.setTextColor(Color.rgb(25,35,31));}
+            b.setText("السمة: "+t);
+        }).show();
+    }
+
+    void chooseFont(Button b){
+        String[] a={"افتراضي","نسخي","أحادي المسافة"};
+        new AlertDialog.Builder(this).setTitle("الخط").setItems(a,(d,w)->{
+            String t=a[w];prefs.edit().putString("font",t).apply();
+            if(w==1)editor.setTypeface(Typeface.SERIF); else if(w==2)editor.setTypeface(Typeface.MONOSPACE); else editor.setTypeface(Typeface.DEFAULT);
+            b.setText("نوع الخط: "+t);
+        }).show();
+    }
+
+TextView statusView(String s){TextView v=tv(s,13,Color.rgb(25,70,55));v.setGravity(Gravity.CENTER_VERTICAL|Gravity.RIGHT);return v;}
 
     void newSubject(boolean ask){
         LinearLayout box=new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL); box.setPadding(dp(12),0,dp(12),0);
@@ -192,13 +410,14 @@ public class MainActivity extends Activity {
                 liveText="";
                 liveView.setText("");
                 if(listening&&!destroying)handler.postDelayed(()->{if(listening&&!destroying)listenOnce();},120);
-                else if(!destroying){mic.setText("●  ابدأ التسجيل");status.setText("تم إيقاف التسجيل.");}
+                if(!showErrors && !destroying) status.setText("التعرف مستمر.");
+                else if(!destroying && !listening){mic.setText("●  ابدأ التسجيل");status.setText("تم إيقاف التسجيل.");}
             }
             public void onPartialResults(Bundle x){
                 ArrayList<String>a=x.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                 if(a!=null&&!a.isEmpty()){
                     liveText=cleanForDisplay(a.get(0));
-                    liveView.setText("جاري الالتقاط: "+liveText);
+                    if(showRecognitionChanges) liveView.setText("جاري الالتقاط: "+liveText);
                     renderLiveText();
                 }
             }
@@ -230,9 +449,9 @@ public class MainActivity extends Activity {
             i.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS,true);
             i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS,5);
             i.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE,false);
-            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,65000L);
+            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,longSpeech?120000L:65000L);
             i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,1000L);
-            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,60000L);
+            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,longSpeech?110000L:60000L);
             sr.startListening(i);
         }catch(Exception e){
             if(listening)handler.postDelayed(()->listenOnce(),400);
@@ -420,6 +639,15 @@ public class MainActivity extends Activity {
         listening=false;
         if(sr!=null)sr.destroy();
         super.onDestroy();
+    }
+
+    static class RuledDrawable extends Drawable{
+        Paint bg=new Paint(1), line=new Paint(1); int spacing;
+        RuledDrawable(int background,int lineColor,int spacing){bg.setColor(background);line.setColor(lineColor);line.setStrokeWidth(1);this.spacing=spacing;}
+        public void draw(Canvas c){c.drawRect(getBounds(),bg);for(int y=getBounds().top+spacing;y<getBounds().bottom;y+=spacing)c.drawLine(getBounds().left,y,getBounds().right,y,line);}
+        public void setAlpha(int a){bg.setAlpha(a);line.setAlpha(a);}
+        public void setColorFilter(android.graphics.ColorFilter f){bg.setColorFilter(f);line.setColorFilter(f);}
+        public int getOpacity(){return android.graphics.PixelFormat.TRANSLUCENT;}
     }
 
     static class GradientDrawableBox extends android.graphics.drawable.GradientDrawable{
