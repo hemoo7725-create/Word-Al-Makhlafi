@@ -153,7 +153,7 @@ public class MainActivity extends Activity {
     }
 
 
-    String safeKey(String s){return s.replaceAll("[^\\\\p{L}\\\\p{N} _-]","_");}
+    String safeKey(String s){return s.replaceAll("[/:*?\\\"<>|]","_");}
 
     void saveCurrent(){
         if(subject==null || subject.trim().isEmpty()){newSubject(true);return;}
